@@ -8,9 +8,29 @@ date: "2023-11-24"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Potential Ideas:
+
+Job Market Analysis
+Hotel Booking Cancellation Prediction
+Movie Revenue Generation
+Video Game Trends and Sales
+Disease Outbreak Prediction
+
+Crime Incidents Accross Canada (USA?)
+
+- Web scrape all crime reports from the past 10 years 
+- Import data into dfs
+- Analyse data based on underlying influence (Interest Rates, Weather, Housing Prices, Lunar Phases, proximity of fast food restraints, trees, government in power, number of social programs)
+- Build a report that discusses the influence of these factors, which ones are the most prominent, and our proposed solution.
+
 
 ```{r}
-#test on noah branch
+# Crime
+
+```
+
+
+```{r}
 
 ```
 
