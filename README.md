@@ -3,6 +3,7 @@ Final Assignment
 
 https://datasetsearch.research.google.com/
 https://data.gov/
+https://www.projectpro.io/article/web-scraping-projects-ideas/475
 
 http://www.understandhomelessness.com/explore/
 http://maps.sasaki.com/visualizations/homelessness/
