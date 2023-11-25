@@ -16,7 +16,7 @@ Movie Revenue Generation
 Video Game Trends and Sales
 Disease Outbreak Prediction
 
-Crime Incidents Accross Canada (USA?)
+Crime Incidents Across Canada (USA?)
 
 - Web scrape all crime reports from the past 10 years 
 - Import data into dfs
@@ -24,13 +24,22 @@ Crime Incidents Accross Canada (USA?)
 - Build a report that discusses the influence of these factors, which ones are the most prominent, and our proposed solution.
 
 
-```{r}
-# Crime
+```{r Libraries}
+library(tidyverse)
+library(RSelenium)
+library(jsonlite)
+library(robotstxt)
 
 ```
 
 
+```{r Web Scraping for Homeless Data}
+
+
+```
+
 ```{r}
 
 ```
+
 
