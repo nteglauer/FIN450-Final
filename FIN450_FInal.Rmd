@@ -27,19 +27,109 @@ Crime Incidents Across Canada (USA?)
 ```{r Libraries}
 library(tidyverse)
 library(RSelenium)
+library(netstat)
 library(jsonlite)
 library(robotstxt)
+library(rvest)
 
 ```
 
+ 
+```{r}
 
-```{r Web Scraping for Homeless Data}
+# Website to navigate
+website <- 'https://www.ebay.com/b/Game-of-Thrones-Collectible-Bobbleheads-and-Figures/149372/bn_93507159?LH_BIN=1&mag=1&rt=nc&_pgn=1'
 
+# Start the server
+rs_driver_object <- rsDriver(browser = "firefox",
+                             chromever = NULL,
+                             verbose = FALSE
+                             )
+
+# Create a Client object
+remDr <- rs_driver_object$client
+
+# Open a browser
+remDr$open()
+
+# Navigate to website
+remDr$navigate(website)
+
+```
+
+```{r eBay scraping}
+
+# Initialize an empty list to store href values
+product_links <- list()
+
+max_pages <- 1
+
+# Loop through pages
+for (page in 1:max_pages) {
+
+  # Find all elements with class 'se-item__link'
+  links <- remDr$findElements(using = "class name", value = "s-item__link")
+  if (length(links) == 0) {
+    links <- remDr$findElements(using = "class name", value = "bsig__title__wrapper")
+  }
+  # Iterate through each element
+  for (link in links) {
+    # Extract href attribute and append to the list
+    product_links <- c(product_links, link$getElementAttribute("href"))
+  }
+   # Click the next page arrow if it exists
+  next_arrow <- remDr$findElement(using = "class name", value = "pagination__next")
+  if (length(next_arrow) > 0) {
+    next_arrow$clickElement()
+  } else {
+    break  # Exit the loop if there is no next page arrow
+  }
+}
+
+product_links
 
 ```
 
 ```{r}
 
-```
+product_links <- product_links[1:5]
 
+# Function to scrape item specifics data from a given link
+scrape_item_specifics <- function(link) {
+  # Navigate to the listing page
+  remDr$navigate(link)
+
+  # Extract item specifics data using rvest
+  labels <- read_html(remDr$getPageSource()[[1]]) %>%
+      html_nodes(".ux-labels-values__labels") %>%
+      html_text()
+
+  values <- read_html(remDr$getPageSource()[[1]]) %>%
+    html_nodes(".ux-labels-values__values") %>%
+    html_text()
+
+  # Create a data frame
+  item_specifics_data <- tibble::tibble(set_names(values, labels))
+
+  
+  
+  return(item_specifics_data)
+}
+
+# Initialize an empty list to store item specifics data
+item_specifics_list <- list()
+
+# Iterate through each link in product_links
+for (link in product_links) {
+  # Scrape item specifics data and append to the list
+  item_specifics_data <- scrape_item_specifics(link)
+  item_specifics_list <- c(item_specifics_list, item_specifics_data)
+}
+
+final_data_frame <- do.call(rbind, item_specifics_list) %>% 
+  as.tibble()
+
+final_data_frame
+
+```
 
