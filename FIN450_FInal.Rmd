@@ -34,12 +34,7 @@ library(rvest)
 
 ```
 
- 
-```{r}
-
-# Website to navigate
-website <- 'https://www.ebay.com/b/Game-of-Thrones-Collectible-Bobbleheads-and-Figures/149372/bn_93507159?LH_BIN=1&mag=1&rt=nc&_pgn=1'
-
+```{r remDr Start}
 # Start the server
 rs_driver_object <- rsDriver(browser = "firefox",
                              chromever = NULL,
@@ -48,6 +43,12 @@ rs_driver_object <- rsDriver(browser = "firefox",
 
 # Create a Client object
 remDr <- rs_driver_object$client
+```
+ 
+```{r imdb Scraping WIP}
+
+# Website to navigate
+website <- 'https://www.imdb.com/search/title/'
 
 # Open a browser
 remDr$open()
@@ -55,81 +56,84 @@ remDr$open()
 # Navigate to website
 remDr$navigate(website)
 
-```
+titletype <- remDr$findElement(using = "id", value = "titleTypeAccordion")$clickElement()
 
-```{r eBay scraping}
+movie_filter_button <- remDr$findElement(using = "xpath", value = "//button[contains(@data-testid, 'test-chip-id-movie')]")$clickElement()
 
-# Initialize an empty list to store href values
-product_links <- list()
+awards <- remDr$findElement(using = "id", value = "awardsAccordion")$clickElement()
 
-max_pages <- 1
+top_1000_button <- remDr$findElement(using = "xpath", value = "//button[contains(@data-testid, 'test-chip-id-top-1000')]")$clickElement()
 
-# Loop through pages
-for (page in 1:max_pages) {
+results_button <- remDr$findElement(using = "xpath", value = "//button[contains(@data-testid, 'adv-search-get-results')]")$clickElement()
 
-  # Find all elements with class 'se-item__link'
-  links <- remDr$findElements(using = "class name", value = "s-item__link")
-  if (length(links) == 0) {
-    links <- remDr$findElements(using = "class name", value = "bsig__title__wrapper")
-  }
-  # Iterate through each element
-  for (link in links) {
-    # Extract href attribute and append to the list
-    product_links <- c(product_links, link$getElementAttribute("href"))
-  }
-   # Click the next page arrow if it exists
-  next_arrow <- remDr$findElement(using = "class name", value = "pagination__next")
-  if (length(next_arrow) > 0) {
-    next_arrow$clickElement()
-  } else {
-    break  # Exit the loop if there is no next page arrow
-  }
+# Click the "See more info" button for all movies
+info_buttons <- remDr$findElements(using = "xpath", value = "//button[contains(@class, 'ipc-icon-button') and contains(@class, 'dli-info-icon')]")
+for (button in info_buttons) {
+  button$clickElement()
+  
+  # Wait for a short period (adjust as needed) to ensure the tab content loads
+  Sys.sleep(2)  # Adjust the sleep duration based on the page loading time
+  
+  # Close the info tab
+  close_button <- remDr$findElement(using = "xpath", value = "//div[contains(@class, 'ipc-promptable-base__close')]//button[@title='Close Prompt']")
+  close_button$clickElement()
 }
 
-product_links
+
+```
+
+```{r box office mojo web scraping}
+website <- 'https://www.boxofficemojo.com/'
+remDr$open()
+remDr$navigate(website)
+alltime <- remDr$findElement(using = 'link text', 'All Time (Worldwide)')$clickElement()
+
+
+scrape_movie_data <- function(num_pages = 5) {
+  all_data <- list()  # Initialize an empty list to store the collected data
+
+  for (page in 1:(num_pages - 1)) {
+    # Read the HTML of the current page
+    url <- as.character(remDr$getCurrentUrl())
+    webpage <- read_html(url)
+    
+    # Extract the table data 
+    table_data <- webpage %>% 
+      html_nodes("#table table") %>% 
+      html_table(fill = TRUE)
+    
+    # Add the data to the overall list
+    all_data <- c(all_data, list(table_data))
+    
+    # Click the "Next" button
+    next_button <- remDr$findElement(using = 'css selector', '.a-last a')$clickElement()
+  }
+
+  # Collect data from the last page
+  url <- as.character(remDr$getCurrentUrl())
+  webpage <- read_html(url)
+  table_data <- webpage %>% 
+    html_nodes("#table table") %>% 
+    html_table(fill = TRUE)
+  all_data <- c(all_data, list(table_data)) 
+
+  return(all_data)
+}
+
+result_data <- scrape_movie_data(num_pages = 5)
+
+last_page <- result_data[[5]]
+last_page[[1]]$Rank <- as.integer(gsub(",", "", last_page[[1]]$Rank))
+result_data[[5]] <- last_page
+
+rev_df <- bind_rows(result_data)
+
+rev_df
+
 
 ```
 
 ```{r}
-
-product_links <- product_links[1:5]
-
-# Function to scrape item specifics data from a given link
-scrape_item_specifics <- function(link) {
-  # Navigate to the listing page
-  remDr$navigate(link)
-
-  # Extract item specifics data using rvest
-  labels <- read_html(remDr$getPageSource()[[1]]) %>%
-      html_nodes(".ux-labels-values__labels") %>%
-      html_text()
-
-  values <- read_html(remDr$getPageSource()[[1]]) %>%
-    html_nodes(".ux-labels-values__values") %>%
-    html_text()
-
-  # Create a data frame
-  item_specifics_data <- tibble::tibble(set_names(values, labels))
-
-  
-  
-  return(item_specifics_data)
-}
-
-# Initialize an empty list to store item specifics data
-item_specifics_list <- list()
-
-# Iterate through each link in product_links
-for (link in product_links) {
-  # Scrape item specifics data and append to the list
-  item_specifics_data <- scrape_item_specifics(link)
-  item_specifics_list <- c(item_specifics_list, item_specifics_data)
-}
-
-final_data_frame <- do.call(rbind, item_specifics_list) %>% 
-  as.tibble()
-
-final_data_frame
 
 ```
 
