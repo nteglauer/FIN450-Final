@@ -141,7 +141,7 @@ click_movie_links <- function(movie_titles) {
     
     remDr$goBack()
     
-    # Pause for a moment
+    # Pause
     Sys.sleep(1)
   }
 }
@@ -160,7 +160,7 @@ for (page in seq(1, nrow(rev_df), movies_per_page)) {
   # Click the next page link
   remDr$findElement(using = 'css selector', '.a-last a')$clickElement()
   
-  # Pause for a moment (optional)
+  # Pause
   Sys.sleep(1)
 }
 
