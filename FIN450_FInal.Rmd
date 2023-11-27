@@ -82,7 +82,7 @@ for (button in info_buttons) {
 
 ```
 
-```{r box office mojo web scraping}
+```{r Revenue For the top 1000 movies}
 website <- 'https://www.boxofficemojo.com/'
 remDr$open()
 remDr$navigate(website)
@@ -134,6 +134,35 @@ rev_df
 ```
 
 ```{r}
+click_movie_links <- function(movie_titles) {
+  for (title in movie_titles) {
+    # Find and click the link for the current movie title
+    movie_link <- remDr$findElement(using = 'link text', title)$clickElement()
+    
+    remDr$goBack()
+    
+    # Pause for a moment
+    Sys.sleep(1)
+  }
+}
+
+movie_titles <- rev_df$Title
+movies_per_page <- 200
+
+# Iterate through each page
+for (page in seq(1, nrow(rev_df), movies_per_page)) {
+  # Extract movie titles for the current page
+  current_page_titles <- movie_titles[page:(page + movies_per_page - 1)]
+  
+  # Click the embedded link for each movie title and go back
+  click_movie_links(current_page_titles)
+  
+  # Click the next page link
+  remDr$findElement(using = 'css selector', '.a-last a')$clickElement()
+  
+  # Pause for a moment (optional)
+  Sys.sleep(1)
+}
 
 ```
 
