@@ -71,8 +71,8 @@ info_buttons <- remDr$findElements(using = "xpath", value = "//button[contains(@
 for (button in info_buttons) {
   button$clickElement()
   
-  # Wait for a short period (adjust as needed) to ensure the tab content loads
-  Sys.sleep(2)  # Adjust the sleep duration based on the page loading time
+
+  Sys.sleep(2)
   
   # Close the info tab
   close_button <- remDr$findElement(using = "xpath", value = "//div[contains(@class, 'ipc-promptable-base__close')]//button[@title='Close Prompt']")
