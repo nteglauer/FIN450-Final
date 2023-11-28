@@ -86,13 +86,20 @@ for (button in info_buttons) {
 website <- 'https://www.boxofficemojo.com/'
 remDr$open()
 remDr$navigate(website)
-alltime <- remDr$findElement(using = 'link text', 'All Time (Worldwide)')$clickElement()
+alltime <- remDr$findElement(using = 'link text', 'Worldwide')$clickElement()
 
 
-scrape_movie_data <- function(num_pages = 5) {
+scrape_movie_data <- function(num_pages = 25) {
   all_data <- list()  # Initialize an empty list to store the collected data
 
-  for (page in 1:(num_pages - 1)) {
+  for (page in 1:(num_pages)) {
+    # Click the year drop down
+    drop_down <- remDr$findElement(using = 'css selector', '.mojo-refinement')$clickElement()
+    remDr$findElement(using = 'css selector',  paste0('li.a-dropdown-item:nth-child(', page, ')'))$clickElement()
+    
+    # Pause
+    Sys.sleep(1)
+    
     # Read the HTML of the current page
     url <- as.character(remDr$getCurrentUrl())
     webpage <- read_html(url)
@@ -102,31 +109,22 @@ scrape_movie_data <- function(num_pages = 5) {
       html_nodes("#table table") %>% 
       html_table(fill = TRUE)
     
+    # Add the "Year" column
+    table_data <- lapply(table_data, function(df) { df$Year <- 2024 - page; return(df) })
+    
     # Add the data to the overall list
     all_data <- c(all_data, list(table_data))
-    
-    # Click the "Next" button
-    next_button <- remDr$findElement(using = 'css selector', '.a-last a')$clickElement()
   }
-
-  # Collect data from the last page
-  url <- as.character(remDr$getCurrentUrl())
-  webpage <- read_html(url)
-  table_data <- webpage %>% 
-    html_nodes("#table table") %>% 
-    html_table(fill = TRUE)
-  all_data <- c(all_data, list(table_data)) 
 
   return(all_data)
 }
 
-result_data <- scrape_movie_data(num_pages = 5)
-
-last_page <- result_data[[5]]
-last_page[[1]]$Rank <- as.integer(gsub(",", "", last_page[[1]]$Rank))
-result_data[[5]] <- last_page
+result_data <- scrape_movie_data(num_pages = 25)
 
 rev_df <- bind_rows(result_data)
+rev_df$`Release Group` <- gsub("\\s{2,}(Re-release)", " \\1", rev_df$`Release Group`)
+rev_df <- rev_df %>% 
+  dplyr::filter(Rank <= 100)
 
 rev_df
 
@@ -146,23 +144,30 @@ click_movie_links <- function(movie_titles) {
   }
 }
 
-movie_titles <- rev_df$Title
-movies_per_page <- 200
+movie_titles <- rev_df$`Release Group`
+num_pages <- 25
+movies_per_page <- 100
 
 # Iterate through each page
-for (page in seq(1, nrow(rev_df), movies_per_page)) {
+for (page in 1:(num_pages)) {
+  # Calculate the start and end indices for the current page
+  start_index <- (page - 1) * movies_per_page + 1
+  end_index <- page * movies_per_page
+  
   # Extract movie titles for the current page
-  current_page_titles <- movie_titles[page:(page + movies_per_page - 1)]
+  current_page_titles <- movie_titles[start_index:end_index]
   
   # Click the embedded link for each movie title and go back
   click_movie_links(current_page_titles)
   
-  # Click the next page link
-  remDr$findElement(using = 'css selector', '.a-last a')$clickElement()
+  # Click the year drop down
+  drop_down <- remDr$findElement(using = 'css selector', '.mojo-refinement')$clickElement()
+  remDr$findElement(using = 'css selector',  paste0('li.a-dropdown-item:nth-child(', page + 1, ')'))$clickElement()
   
   # Pause
   Sys.sleep(1)
 }
 
 ```
+
 
