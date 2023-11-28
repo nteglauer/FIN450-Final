@@ -166,3 +166,45 @@ for (page in seq(1, nrow(rev_df), movies_per_page)) {
 
 ```
 
+```{r imdb scraping release}
+
+library(rvest)
+library(stringr)
+
+# Replace 'your_url_here' with the actual URL of the webpage
+url <- "https://www.imdb.com/calendar/?ref_=rlm&region=US&type=MOVIE"
+
+# Read the HTML content of the webpage
+webpage <- read_html(url)
+
+# Use the identified CSS selector for the movie elements
+movie_elements <- html_nodes(webpage, '.ipc-metadata-list-summary-item')
+
+# Extract information from each movie element
+movies_data <- lapply(movie_elements, function(movie) {
+  # Extract title
+  title <- html_text(html_node(movie, '.ipc-metadata-list-summary-item__t'))
+
+  # Extract year (assuming it's within the title link)
+  year <- gsub("[^0-9]", "", str_match(title, "\\((\\d{4})\\)")[, 2])
+
+  # Extract genres
+  genres <- html_text(html_nodes(movie, '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__tl .ipc-inline-list__item'))
+
+  # Extract stars
+  stars <- html_text(html_nodes(movie, '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__stl .ipc-inline-list__item'))
+
+  # Extract director (assuming it's within an element with a specific class)
+  director <- html_text(html_node(movie, '.your-director-selector-here'))
+
+  # Return a list with the extracted information
+  list(title = title, year = year, genres = genres, stars = stars, director = director)
+})
+
+movies_df <- do.call(rbind, movies_data)
+
+# Print the resulting data frame
+print(movies_df)
+
+```
+
