@@ -8,22 +8,6 @@ date: "2023-11-24"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-Potential Ideas:
-
-Job Market Analysis
-Hotel Booking Cancellation Prediction
-Movie Revenue Generation
-Video Game Trends and Sales
-Disease Outbreak Prediction
-
-Crime Incidents Across Canada (USA?)
-
-- Web scrape all crime reports from the past 10 years 
-- Import data into dfs
-- Analyse data based on underlying influence (Interest Rates, Weather, Housing Prices, Lunar Phases, proximity of fast food restraints, trees, government in power, number of social programs)
-- Build a report that discusses the influence of these factors, which ones are the most prominent, and our proposed solution.
-
-
 ```{r Libraries}
 library(tidyverse)
 library(RSelenium)
@@ -44,52 +28,11 @@ rs_driver_object <- rsDriver(browser = "firefox",
 # Create a Client object
 remDr <- rs_driver_object$client
 ```
- 
-```{r imdb Scraping WIP}
 
-# Website to navigate
-website <- 'https://www.imdb.com/search/title/'
+```{r Revenue For the top 200 movies of each year from 2024 - num_pages}
 
-# Open a browser
-remDr$open()
-
-# Navigate to website
-remDr$navigate(website)
-
-titletype <- remDr$findElement(using = "id", value = "titleTypeAccordion")$clickElement()
-
-movie_filter_button <- remDr$findElement(using = "xpath", value = "//button[contains(@data-testid, 'test-chip-id-movie')]")$clickElement()
-
-awards <- remDr$findElement(using = "id", value = "awardsAccordion")$clickElement()
-
-top_1000_button <- remDr$findElement(using = "xpath", value = "//button[contains(@data-testid, 'test-chip-id-top-1000')]")$clickElement()
-
-results_button <- remDr$findElement(using = "xpath", value = "//button[contains(@data-testid, 'adv-search-get-results')]")$clickElement()
-
-# Click the "See more info" button for all movies
-info_buttons <- remDr$findElements(using = "xpath", value = "//button[contains(@class, 'ipc-icon-button') and contains(@class, 'dli-info-icon')]")
-for (button in info_buttons) {
-  button$clickElement()
-  
-
-  Sys.sleep(2)
-  
-  # Close the info tab
-  close_button <- remDr$findElement(using = "xpath", value = "//div[contains(@class, 'ipc-promptable-base__close')]//button[@title='Close Prompt']")
-  close_button$clickElement()
-}
-
-
-```
-
-```{r Revenue For the top 1000 movies}
-website <- 'https://www.boxofficemojo.com/'
-remDr$open()
-remDr$navigate(website)
-alltime <- remDr$findElement(using = 'link text', 'Worldwide')$clickElement()
-
-
-scrape_movie_data <- function(num_pages = 25) {
+#Scrapes the revenue of each movie flipping through each year.
+scrape_revenue_data <- function(num_pages) {
   all_data <- list()  # Initialize an empty list to store the collected data
 
   for (page in 1:(num_pages)) {
@@ -115,59 +58,141 @@ scrape_movie_data <- function(num_pages = 25) {
     # Add the data to the overall list
     all_data <- c(all_data, list(table_data))
   }
-
+  
   return(all_data)
 }
 
-result_data <- scrape_movie_data(num_pages = 25)
+```
 
-rev_df <- bind_rows(result_data)
-rev_df$`Release Group` <- gsub("\\s{2,}(Re-release)", " \\1", rev_df$`Release Group`)
-rev_df <- rev_df %>% 
-  dplyr::filter(Rank <= 100)
+```{r Extract Movie Specific Data}
 
-rev_df
-
+#Scrapes the Movie specific data, returns a wide df of the movie's data
+extract_movie_data <- function(webpage, title) {
+  # Target the specific div that contains the table rows
+  table_nodes <- webpage %>% 
+    html_nodes(".mojo-summary-values .a-section.a-spacing-none")
+  
+  # Initialize empty lists to store headers and values
+  headers <- c()
+  values <- c()
+  
+  # Iterate through each table row
+  for (node in table_nodes) {
+    # Extract the header
+    header <- node %>% html_node("span:nth-child(1)") %>% html_text()
+    
+    # Extract the value
+    value_node <- node %>% html_node("span:nth-child(2)")
+    value <- value_node %>% html_text(trim = TRUE)
+    
+    # Append the header and value to the lists
+    headers <- c(headers, header)
+    values <- c(values, value)
+  }
+  
+  # Combine headers and values into a data frame
+  table_data <- data.frame(Header = headers, Value = values)
+  table_data$Title <- title
+  df_wide <- table_data %>% 
+    tidyr::pivot_wider(names_from = Header, values_from = Value)
+  
+  return(df_wide)
+}
 
 ```
 
-```{r}
-click_movie_links <- function(movie_titles) {
+```{r Main Scraper}
+
+# Flips through each Movie within each Year and aggregates the specific year's movie data
+scrape_movie_data <- function(movie_titles) {
+  movie_df <- tibble()
   for (title in movie_titles) {
     # Find and click the link for the current movie title
+    address <- as.character(remDr$getCurrentUrl())
     movie_link <- remDr$findElement(using = 'link text', title)$clickElement()
     
-    remDr$goBack()
+    remDr$findElement(using = 'link text', 'Title Summary')$clickElement()
+    remDr$findElement(using = 'link text', 'Cast and Crew')$clickElement()
+    
+    url <- as.character(remDr$getCurrentUrl())
+    webpage <- read_html(url)
+    movie_data <- extract_movie_data(webpage, title)
+    
+    # Append the movie_data to the global movie_df
+    movie_df <- bind_rows(movie_df, movie_data)
+    
+    remDr$navigate(address)
     
     # Pause
     Sys.sleep(1)
   }
-}
-
-movie_titles <- rev_df$`Release Group`
-num_pages <- 25
-movies_per_page <- 100
-
-# Iterate through each page
-for (page in 1:(num_pages)) {
-  # Calculate the start and end indices for the current page
-  start_index <- (page - 1) * movies_per_page + 1
-  end_index <- page * movies_per_page
-  
-  # Extract movie titles for the current page
-  current_page_titles <- movie_titles[start_index:end_index]
-  
-  # Click the embedded link for each movie title and go back
-  click_movie_links(current_page_titles)
-  
-  # Click the year drop down
-  drop_down <- remDr$findElement(using = 'css selector', '.mojo-refinement')$clickElement()
-  remDr$findElement(using = 'css selector',  paste0('li.a-dropdown-item:nth-child(', page + 1, ')'))$clickElement()
-  
-  # Pause
-  Sys.sleep(1)
+  return(movie_df)
 }
 
 ```
 
+```{r Scrape and Aggregate data}
+
+#Flips through each year and aggregates all year's data
+scrape_and_aggregate_data <- function(num_pages, movies_per_page, movie_titles) {
+  # Initialize an empty data frame to store aggregated movie data
+  final_df <- tibble()
+  
+  for (page in 1:num_pages) {
+    # Calculate the start and end indices for the current page
+    start_index <- (page - 1) * movies_per_page + 1
+    end_index <- page * movies_per_page
+    
+    # Extract movie titles for the current page
+    current_page_titles <- movie_titles[start_index:end_index]
+    
+    # Scrape movie specific data
+    movie_df <- scrape_movie_data(current_page_titles)
+    final_df <- bind_rows(final_df, movie_df)
+    
+    # Click the year drop down
+    drop_down <- remDr$findElement(using = 'css selector', '.mojo-refinement')$clickElement()
+    remDr$findElement(using = 'css selector', paste0('li.a-dropdown-item:nth-child(', page + 1, ')'))$clickElement()
+    
+    # Pause
+    Sys.sleep(1)
+  }
+  
+  return(final_df)
+}
+```
+
+```{r MAIN}
+website <- 'https://www.boxofficemojo.com/'
+remDr$open()
+remDr$navigate(website)
+alltime <- remDr$findElement(using = 'link text', 'Worldwide')$clickElement()
+
+#RUN EVERYTHING UNDER HERE TO TEST 
+
+#CHANGE AS NEEDED
+num_pages <- 25 
+movies_per_page <- 100
+
+# Collect Revenue data
+result_data <- scrape_revenue_data(num_pages)
+rev_df <- bind_rows(result_data)
+rev_df$`Release Group` <- gsub("\\s{2,}(Re-release)", " \\1", rev_df$`Release Group`)
+rev_df <- rev_df %>% 
+  dplyr::filter(Rank <= movies_per_page)
+
+rev_df
+
+movie_titles <- rev_df$`Release Group`
+
+# Return to first page
+drop_down <- remDr$findElement(using = 'css selector', '.mojo-refinement')$clickElement()
+remDr$findElement(using = 'css selector',  paste0('li.a-dropdown-item:nth-child(1)'))$clickElement()
+
+
+movie_df <- scrape_and_aggregate_data(num_pages, movies_per_page, movie_titles)
+
+movie_df
+
+```
 
