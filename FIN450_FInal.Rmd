@@ -130,7 +130,7 @@ extract_movie_data <- function(webpage, title) {
 
 ```
 
-```{r Main Scraper}
+```{r Flip through Movies within each Year and Aggregate}
 
 # Flips through each Movie within each Year and aggregates the specific year's movie data
 scrape_movie_data <- function(movie_titles) {
@@ -160,7 +160,7 @@ scrape_movie_data <- function(movie_titles) {
 
 ```
 
-```{r Scrape and Aggregate data}
+```{r Flip through Each year and Aggregate each year's movie data}
 
 #Flips through each year and aggregates all year's data
 scrape_and_aggregate_data <- function(num_pages, movies_per_page, movie_titles) {
@@ -224,7 +224,7 @@ movie_df <- scrape_and_aggregate_data(num_pages, movies_per_page, movie_titles)
 movie_df
 
 # Change File Location to save data
-write.xlsx(movie_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
+#write.xlsx(movie_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
 
 ```
 
