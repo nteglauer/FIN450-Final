@@ -15,6 +15,7 @@ library(netstat)
 library(jsonlite)
 library(robotstxt)
 library(rvest)
+library(openxlsx)
 
 ```
 
@@ -93,8 +94,36 @@ extract_movie_data <- function(webpage, title) {
   # Combine headers and values into a data frame
   table_data <- data.frame(Header = headers, Value = values)
   table_data$Title <- title
-  df_wide <- table_data %>% 
+  movie_wide <- table_data %>% 
     tidyr::pivot_wider(names_from = Header, values_from = Value)
+  
+  # Collect crew table
+  crew_table <- webpage %>% 
+  html_nodes("#principalCrew") %>% 
+  html_table(fill = TRUE)
+ 
+   # Convert to wide format 
+  crew_df <- crew_table[[1]] %>% 
+    group_by(Role) %>% 
+    summarize(NameCombined = paste(Filmmakers, collapse = ", ")) %>% 
+    ungroup() %>% 
+    pivot_wider(names_from = Role, 
+                values_from = NameCombined)
+  
+  # Collect Cast table
+  cast_table <- webpage %>% 
+    html_nodes("#principalCast") %>% 
+    html_table(fill = TRUE)
+  
+  # Convert to wide format
+  cast_df <- cast_table[[1]] %>% 
+    mutate(Cast = paste(Cast, collapse = ", ")) %>% 
+    pull(Cast) %>% 
+    unname() %>% 
+    tibble(Cast = .) %>% 
+    dplyr::distinct(Cast)
+  
+  df_wide <- cbind(movie_wide, cast_df, crew_df)
   
   return(df_wide)
 }
@@ -171,8 +200,8 @@ alltime <- remDr$findElement(using = 'link text', 'Worldwide')$clickElement()
 #RUN EVERYTHING UNDER HERE TO TEST 
 
 #CHANGE AS NEEDED
-num_pages <- 25 
-movies_per_page <- 100
+num_pages <- 5 
+movies_per_page <- 10
 
 # Collect Revenue data
 result_data <- scrape_revenue_data(num_pages)
@@ -193,6 +222,9 @@ remDr$findElement(using = 'css selector',  paste0('li.a-dropdown-item:nth-child(
 movie_df <- scrape_and_aggregate_data(num_pages, movies_per_page, movie_titles)
 
 movie_df
+
+# Change File Location to save data
+write.xlsx(movie_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
 
 ```
 
@@ -236,10 +268,10 @@ for (i in seq_along(movie_elements)) {
 }
 
 # Convert the list of lists into a data frame
-movies_df <- bind_rows(movies_data)
+new_movies_df <- bind_rows(movies_data)
 
 # Print the resulting data frame
-print(movies_df)
+print(new_movies_df)
 
 ```
 
