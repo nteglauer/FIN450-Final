@@ -15,6 +15,7 @@ library(netstat)
 library(jsonlite)
 library(robotstxt)
 library(rvest)
+library(openxlsx)
 
 ```
 
@@ -29,7 +30,54 @@ rs_driver_object <- rsDriver(browser = "firefox",
 remDr <- rs_driver_object$client
 ```
 
-```{r Revenue For the top 200 movies of each year from 2024 - num_pages}
+```{r scraping new release}
+library(rvest)
+library(stringr)
+library(dplyr)
+library(tidyr)
+
+# Replace 'your_url_here' with the actual URL of the webpage
+url <- "https://www.imdb.com/calendar/?ref_=rlm&region=US&type=MOVIE"
+
+# Read the HTML content of the webpage
+webpage <- read_html(url)
+
+# Use the identified CSS selector for the movie elements
+movie_elements <- html_nodes(webpage, '.ipc-metadata-list-summary-item')
+
+# Initialize an empty list to store data for each movie
+movies_data <- list()
+
+# Loop through each movie element
+for (i in seq_along(movie_elements)) {
+  # Extract title
+  title <- html_text(html_node(movie_elements[[i]], '.ipc-metadata-list-summary-item__t'))
+
+  # Extract year (assuming it's within the title link)
+  year <- gsub("[^0-9]", "", str_match(title, "\\((\\d{4})\\)")[, 2])
+
+  # Extract genres
+  genres <- html_text(html_nodes(movie_elements[[i]], '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__tl .ipc-inline-list__item'))
+
+  # Extract stars
+  stars <- html_text(html_nodes(movie_elements[[i]], '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__stl .ipc-inline-list__item'))
+
+  # Store the data for the current movie in a list
+  movie_data <- list(title = title, year = year, genres = paste(genres, collapse = ", "), stars = paste(stars, collapse = ", "))
+
+  # Append the list to the movies_data list
+  movies_data <- append(movies_data, list(movie_data))
+}
+
+# Convert the list of lists into a data frame
+new_movies_df <- bind_rows(movies_data)
+
+# Print the resulting data frame
+print(new_movies_df)
+
+```
+
+```{r Revenue For the top movies_per_page movies of each year from 2024 - num_pages}
 
 #Scrapes the revenue of each movie flipping through each year.
 scrape_revenue_data <- function(num_pages) {
@@ -93,15 +141,58 @@ extract_movie_data <- function(webpage, title) {
   # Combine headers and values into a data frame
   table_data <- data.frame(Header = headers, Value = values)
   table_data$Title <- title
-  df_wide <- table_data %>% 
+  movie_wide <- table_data %>% 
     tidyr::pivot_wider(names_from = Header, values_from = Value)
+  
+  # Collect crew table
+  crew_table <- webpage %>% 
+    html_nodes("#principalCrew") %>% 
+    html_table(fill = TRUE)
+ 
+  if (length(crew_table) == 0) {
+    crew_df <- data.frame(Crew = character(), stringsAsFactors = FALSE)
+  } else {
+    # If cast_table is not empty, proceed with data processing
+    crew_df <- crew_table[[1]] %>% 
+    group_by(Role) %>% 
+    summarize(NameCombined = paste(Filmmakers, collapse = ", ")) %>% 
+    ungroup() %>% 
+    pivot_wider(names_from = Role, 
+                values_from = NameCombined)
+  }
+  
+  # Collect Cast table
+  cast_table <- webpage %>% 
+    html_nodes("#principalCast") %>% 
+    html_table(fill = TRUE)
+
+  # Check if cast_table is not empty before proceeding
+  if (length(cast_table) == 0) {
+    cast_df <- data.frame(Cast = character(), stringsAsFactors = FALSE)
+  } else {
+    # If cast_table is not empty, proceed with data processing
+    cast_df <- cast_table[[1]] %>% 
+      as.data.frame() %>% 
+      mutate(Cast = paste(Cast, collapse = ", ")) %>% 
+      pull(Cast) %>% 
+      unname() %>% 
+      tibble(Cast = .) %>% 
+      dplyr::distinct(Cast)
+  }
+  
+  if (!is.null(cast_df) && nrow(cast_df) > 0) {
+    df_wide <- cbind(movie_wide, cast_df, crew_df)
+  } else {
+    df_wide <- cbind(movie_wide, crew_df)
+  }
+
   
   return(df_wide)
 }
 
 ```
 
-```{r Main Scraper}
+```{r Flip through Movies within each Year and Aggregate}
 
 # Flips through each Movie within each Year and aggregates the specific year's movie data
 scrape_movie_data <- function(movie_titles) {
@@ -111,6 +202,8 @@ scrape_movie_data <- function(movie_titles) {
     address <- as.character(remDr$getCurrentUrl())
     movie_link <- remDr$findElement(using = 'link text', title)$clickElement()
     
+    
+    print(title)
     remDr$findElement(using = 'link text', 'Title Summary')$clickElement()
     remDr$findElement(using = 'link text', 'Cast and Crew')$clickElement()
     
@@ -131,7 +224,7 @@ scrape_movie_data <- function(movie_titles) {
 
 ```
 
-```{r Scrape and Aggregate data}
+```{r Flip through Each year and Aggregate each year's movie data}
 
 #Flips through each year and aggregates all year's data
 scrape_and_aggregate_data <- function(num_pages, movies_per_page, movie_titles) {
@@ -172,7 +265,7 @@ alltime <- remDr$findElement(using = 'link text', 'Worldwide')$clickElement()
 
 #CHANGE AS NEEDED
 num_pages <- 25 
-movies_per_page <- 100
+movies_per_page <- 75
 
 # Collect Revenue data
 result_data <- scrape_revenue_data(num_pages)
@@ -194,53 +287,42 @@ movie_df <- scrape_and_aggregate_data(num_pages, movies_per_page, movie_titles)
 
 movie_df
 
+# Aggregate movie_df and rev_df 
+combined_df <- cbind(rev_df, movie_df)
+
+# Change File Location to save data
+write.xlsx(combined_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
 ```
 
-```{r scraping new release}
-library(rvest)
-library(stringr)
-library(dplyr)
-library(tidyr)
+```{r Data Wrangling and Parsing}
 
-# Replace 'your_url_here' with the actual URL of the webpage
-url <- "https://www.imdb.com/calendar/?ref_=rlm&region=US&type=MOVIE"
+temp <- combined_df %>% 
+  dplyr::select(-Title)
 
-# Read the HTML content of the webpage
-webpage <- read_html(url)
+df <- temp[, -15] %>% 
+  dplyr::rename(Title = `Release Group`,
+                `% Domestic` = `%...5`,
+                `% Foreign` = `%...7`,
+                Distributor = `Domestic Distributor`) %>% 
+  dplyr::mutate(Distributor = sub("See full company information$", "", Distributor),
+                Worldwide = parse_number(gsub("[$,]", "", Worldwide)),
+                Domestic = parse_number(gsub("[$,]", "", Domestic)),
+                Foreign = parse_number(gsub("[$,]", "", Foreign)),
+                `Domestic Opening` = parse_number(gsub("[$,]", "", `Domestic Opening`)),
+                Budget = parse_number(gsub("[$,]", "", Budget)),
+                `% Domestic` = as.numeric(parse_number(`% Domestic`)) / 100,
+                `% Foreign` = as.numeric(parse_number(`% Foreign`)) / 100,
+                `Earliest Release Date` = mdy(str_extract(`Earliest Release Date`, "[A-Za-z]+ [0-9]+, [0-9]+")),
+                Hours = as.numeric(str_extract(`Running Time`, "\\d+(?= hr)")),
+                Minutes = as.numeric(str_extract(`Running Time`, "\\d+(?= min)")),
+                Hours = ifelse(is.na(Hours), 0, Hours),
+                Minutes = ifelse(is.na(Minutes), 0, Minutes),
+                TotalMinutes = Hours * 60 + Minutes,
+                Genres = strsplit(Genres, "\r\n[[:space:]]*\\r\\n"),
+                Genres = sapply(Genres, function(x) paste(trimws(x), collapse = ", "))) %>%
+                select(-c(`Running Time`, Hours, Minutes))
 
-# Use the identified CSS selector for the movie elements
-movie_elements <- html_nodes(webpage, '.ipc-metadata-list-summary-item')
-
-# Initialize an empty list to store data for each movie
-movies_data <- list()
-
-# Loop through each movie element
-for (i in seq_along(movie_elements)) {
-  # Extract title
-  title <- html_text(html_node(movie_elements[[i]], '.ipc-metadata-list-summary-item__t'))
-
-  # Extract year (assuming it's within the title link)
-  year <- gsub("[^0-9]", "", str_match(title, "\\((\\d{4})\\)")[, 2])
-
-  # Extract genres
-  genres <- html_text(html_nodes(movie_elements[[i]], '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__tl .ipc-inline-list__item'))
-
-  # Extract stars
-  stars <- html_text(html_nodes(movie_elements[[i]], '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__stl .ipc-inline-list__item'))
-
-  # Store the data for the current movie in a list
-  movie_data <- list(title = title, year = year, genres = paste(genres, collapse = ", "), stars = paste(stars, collapse = ", "))
-
-  # Append the list to the movies_data list
-  movies_data <- append(movies_data, list(movie_data))
-}
-
-# Convert the list of lists into a data frame
-movies_df <- bind_rows(movies_data)
-
-# Print the resulting data frame
-print(movies_df)
-
+df
 ```
 
 ```{r import economic data}
