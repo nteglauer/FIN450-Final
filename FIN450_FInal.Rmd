@@ -285,10 +285,10 @@ remDr$findElement(using = 'css selector',  paste0('li.a-dropdown-item:nth-child(
 
 movie_df <- scrape_and_aggregate_data(num_pages, movies_per_page, movie_titles)
 
-movie_df
-
 # Aggregate movie_df and rev_df 
 combined_df <- cbind(rev_df, movie_df)
+
+combined_df
 
 # Change File Location to save data
 write.xlsx(combined_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
@@ -317,7 +317,7 @@ df <- temp[, -15] %>%
                 Minutes = as.numeric(str_extract(`Running Time`, "\\d+(?= min)")),
                 Hours = ifelse(is.na(Hours), 0, Hours),
                 Minutes = ifelse(is.na(Minutes), 0, Minutes),
-                TotalMinutes = Hours * 60 + Minutes,
+                `Run Time (Mins)` = Hours * 60 + Minutes,
                 Genres = strsplit(Genres, "\r\n[[:space:]]*\\r\\n"),
                 Genres = sapply(Genres, function(x) paste(trimws(x), collapse = ", "))) %>%
                 select(-c(`Running Time`, Hours, Minutes))
