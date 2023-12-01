@@ -325,4 +325,44 @@ df <- temp[, -15] %>%
 df
 ```
 
+```{r import economic data}
 
+library(tidyr)
+library(tidyquant)
+library(dplyr)
+
+# Set get ="economic.data" in tq_get()
+import_economic_data <- tidyquant::tq_get(c("DPCCRV1Q225SBEA", "UNRATE", "DGS10"),
+                                         get  = "economic.data",
+                                         from = "1990-01-01",
+                                         to   = Sys.Date()) %>% 
+  dplyr::mutate(symbol = dplyr::case_when(symbol == "DPCCRV1Q225SBEA" ~ "Consumer Spending % (USA)",
+                                          symbol == "UNRATE" ~ "Unemployment Rate % (USA)",
+                                          symbol == "DGS10" ~ "U.S Treasury Yield "))
+
+economic_data <- import_economic_data %>%
+  tidyr::pivot_wider(names_from = symbol, values_from = price) %>%
+  tidyr::complete(date = seq.Date(from = min(date), to = max(date), by = "1 month")) %>%
+  dplyr::arrange(date)
+
+economic_data # df that includes Consumer Spending, Unemployment Rate, and Fed Funds Rate in the United States with aligned dates
+
+
+theatre_stocks <- tidyquant::tq_get(
+  c("IMAX", "CGX", "SPY"),
+  get  = "stock.prices",
+) %>%
+  dplyr::transmute(date, series = symbol, value = adjusted) %>%
+  dplyr::group_by(series) %>%
+  dplyr::mutate(
+    ret = log(value / dplyr::lag(value))
+  ) %>%
+  dplyr::select(-value) %>%
+  tidyr::pivot_wider(names_from = series, values_from = ret) %>%
+  tidyr::drop_na()
+
+
+theatre_stocks #includes returns daily for IMAX and Cineplex stocks
+
+
+```
