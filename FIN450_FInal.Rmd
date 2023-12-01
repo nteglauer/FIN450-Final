@@ -16,6 +16,8 @@ library(jsonlite)
 library(robotstxt)
 library(rvest)
 library(openxlsx)
+library(kableExtra)
+library(broom)
 
 ```
 
@@ -152,7 +154,7 @@ extract_movie_data <- function(webpage, title) {
   if (length(crew_table) == 0) {
     crew_df <- data.frame(Crew = character(), stringsAsFactors = FALSE)
   } else {
-    # If cast_table is not empty, proceed with data processing
+    # If crew_table is not empty, proceed with data processing
     crew_df <- crew_table[[1]] %>% 
     group_by(Role) %>% 
     summarize(NameCombined = paste(Filmmakers, collapse = ", ")) %>% 
@@ -180,6 +182,7 @@ extract_movie_data <- function(webpage, title) {
       dplyr::distinct(Cast)
   }
   
+  # Check if table exists and binds existing ones
   if (!is.null(cast_df) && nrow(cast_df) > 0) {
     df_wide <- cbind(movie_wide, cast_df, crew_df)
   } else {
@@ -270,6 +273,7 @@ movies_per_page <- 75
 # Collect Revenue data
 result_data <- scrape_revenue_data(num_pages)
 rev_df <- bind_rows(result_data)
+# Fix title for movies with (Re-release) to align with website html identifier
 rev_df$`Release Group` <- gsub("\\s{2,}(Re-release)", " \\1", rev_df$`Release Group`)
 rev_df <- rev_df %>% 
   dplyr::filter(Rank <= movies_per_page)
@@ -320,7 +324,8 @@ df <- temp[, -15] %>%
                 `Run Time (Mins)` = Hours * 60 + Minutes,
                 Genres = strsplit(Genres, "\r\n[[:space:]]*\\r\\n"),
                 Genres = sapply(Genres, function(x) paste(trimws(x), collapse = ", "))) %>%
-                select(-c(`Running Time`, Hours, Minutes))
+                dplyr::select(-c(`Running Time`, Hours, Minutes)) %>% 
+  dplyr::filter(!grepl("Re-release", Title, ignore.case = TRUE))
 
 df
 ```
@@ -366,3 +371,92 @@ theatre_stocks #includes returns daily for IMAX and Cineplex stocks
 
 
 ```
+
+REPORT LAYOUT:
+- Introduction
+- General Analysis and insights (try to find unique insights)
+- Analysis of factors affecting revenue 
+- ML and prediction of select movies
+
+```{r Movie Revenue Trend over the Years}
+
+revenue <- df %>% 
+  dplyr::select(Title, Worldwide, Domestic, Foreign,`Domestic Opening`, `Earliest Release Date`, Year) %>% 
+  dplyr::filter(`Earliest Release Date` >= "1999-01-01") %>% 
+  stats::na.omit() %>% 
+  dplyr::group_by(Year) %>% 
+  dplyr::summarise(Avg_Worldwide = mean(Worldwide),
+                   Avg_Domestic = mean(Domestic),
+                   Avg_Foreign = mean(Foreign))
+
+revenue_plot <- revenue %>% 
+  ggplot(aes(x = Year)) +
+  geom_line(aes(y = Avg_Worldwide, color = "Avg Worldwide"), size = 1) +
+  geom_line(aes(y = Avg_Domestic, color = "Avg Domestic"), size = 1) +
+  geom_line(aes(y = Avg_Foreign, color = "Avg Foreign"), size = 1) +
+  labs(title = "Avg Revenue Over Time",
+       x = "Release Date",
+       y = "Revenue (in millions)",
+       color = "Revenue Type") +
+  theme_minimal()
+  
+revenue_plot
+
+```
+
+```{r Release Month Analysis}
+
+release_month <- df %>% 
+  dplyr::select(Title, Worldwide, `Earliest Release Date`) %>% 
+  dplyr::mutate(Month = month(`Earliest Release Date`, label = TRUE))
+
+release_month_plot <- release_month %>% 
+  dplyr::group_by(Month) %>% 
+  dplyr::summarise(AvgRevenue = mean(Worldwide)) %>% 
+  ggplot(aes(x = Month, y = AvgRevenue)) +
+    geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
+    labs(title = "Average Revenue by Release Month", x = "Release Month", y = "Average Revenue")
+
+release_month_plot
+
+# Anova Analysis shows low P value: there are significant differences in the average revenue across different months of movie releases. 
+release_month_anova <- aov(Worldwide ~ Month, data = release_month)
+anova_table <- kable(tidy(release_month_anova)) %>% 
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+anova_table
+```
+
+```{r Genre Analysis}
+
+genre <- df %>% 
+  dplyr::select(Title, Worldwide, Genres) %>% 
+  tidyr::separate_rows(Genres, sep = ", ")
+
+genre_plot <- genre %>% 
+  ggplot(aes(x = Genres, y = Worldwide, fill = Genres)) +
+  geom_boxplot() +
+  coord_flip() +  # To make the plot horizontal for better readability
+  labs(title = "Distribution of Revenue Across Genres",
+       x = "Genres",
+       y = "Revenue") +
+  theme(legend.position = "none")
+  
+genre_plot
+
+# Used Median b/c of presence of outliers
+genre_summary <- genre %>%
+  group_by(Genres) %>%
+  summarise(Median_Revenue = median(Worldwide, na.rm = TRUE)) %>%
+  arrange(desc(Median_Revenue)) %>% 
+  head(10) %>% 
+  kbl(caption = "Top 10 Genres by Revenue",
+      col.names = c("Genre", "Median Revenue")) %>% 
+  kable_classic(full_width = F, html_font = "Times New Roman")
+
+
+genre_summary
+
+```
+
+
+
