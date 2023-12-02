@@ -414,9 +414,10 @@ release_month <- df %>%
 release_month_plot <- release_month %>% 
   dplyr::group_by(Month) %>% 
   dplyr::summarise(AvgRevenue = mean(Worldwide)) %>% 
-  ggplot(aes(x = Month, y = AvgRevenue)) +
-    geom_bar(stat = "identity", fill = "blue", alpha = 0.7) +
-    labs(title = "Average Revenue by Release Month", x = "Release Month", y = "Average Revenue")
+  ggplot(aes(x = Month, y = AvgRevenue, fill = Month)) +
+    geom_bar(stat = "identity") +
+    labs(title = "Average Revenue by Release Month", x = "Release Month", y = "Average Revenue") +
+  theme(legend.position = "none")
 
 release_month_plot
 
@@ -463,7 +464,7 @@ genre_distribution <- genre %>%
   arrange(desc(Movie_Count)) %>% 
   ggplot(aes(x = Genres, y = Movie_Count, fill = Genres)) +
   geom_bar(stat = "identity") +
-  labs(title = "Distribution of Movie Count for Different Genres",
+  labs(title = "Distribution of Movies Across Different Genres",
          x = "Genres",
          y = "Movie Count") +
   coord_flip() +
@@ -480,7 +481,7 @@ genres_per_movie <- df %>%
   ggplot(aes(x = factor(Genre_Count), y = Median_rev, fill = factor(Genre_Count))) +
   geom_bar(stat = "identity", position = "dodge") +
   geom_text(aes(label = Movie_Count), vjust = -0.5) +  # Display movie count on top of bars
-  labs(title = "Median Revenue and Movie Count by Genre Count",
+  labs(title = "Median Revenue by Number of Genres and Number of Movies",
        x = "Number of Genres",
        y = "Median Revenue") +
   theme_minimal() +
