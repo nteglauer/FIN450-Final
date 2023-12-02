@@ -301,7 +301,15 @@ write.xlsx(combined_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/
 
 ```{r Data Wrangling and Parsing}
 
-temp <- combined_df %>% 
+library(lubridate)
+library(readxl)
+url <- "https://raw.githubusercontent.com/nteglauer/FIN450-Final/master/combined_df.xlsx"
+download.file(url, destfile = "combined_df.xlsx", mode = "wb")
+combined_all <- read_excel("combined_df.xlsx")
+
+
+
+temp <- combined_all %>% 
   dplyr::select(-Title)
 
 df <- temp[, -15] %>% 
