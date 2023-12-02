@@ -19,6 +19,7 @@ library(openxlsx)
 library(kableExtra)
 library(broom)
 
+
 ```
 
 ```{r remDr Start}
@@ -378,7 +379,7 @@ REPORT LAYOUT:
 - Analysis of factors affecting revenue 
 - ML and prediction of select movies
 
-```{r Movie Revenue Trend over the Years}
+```{r Movie Revenue Trends over Time}
 
 revenue <- df %>% 
   dplyr::select(Title, Worldwide, Domestic, Foreign,`Domestic Opening`, `Earliest Release Date`, Year) %>% 
@@ -456,6 +457,36 @@ genre_summary <- genre %>%
 
 genre_summary
 
+genre_distribution <- genre %>% 
+  dplyr::group_by(Genres) %>% 
+  dplyr::summarise(Movie_Count = n()) %>% 
+  arrange(desc(Movie_Count)) %>% 
+  ggplot(aes(x = Genres, y = Movie_Count, fill = Genres)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Distribution of Movie Count for Different Genres",
+         x = "Genres",
+         y = "Movie Count") +
+  coord_flip() +
+  theme(legend.position = "none")
+
+genre_distribution
+
+genres_per_movie <- df %>% 
+  dplyr::select(Title, Worldwide, Genres) %>% 
+  dplyr::mutate(Genre_Count = str_count(Genres, ",") + 1) %>% 
+  dplyr::group_by(Genre_Count) %>% 
+  dplyr::summarise(Median_rev = median(Worldwide),
+                   Movie_Count = n()) %>% 
+  ggplot(aes(x = factor(Genre_Count), y = Median_rev, fill = factor(Genre_Count))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = Movie_Count), vjust = -0.5) +  # Display movie count on top of bars
+  labs(title = "Median Revenue and Movie Count by Genre Count",
+       x = "Number of Genres",
+       y = "Median Revenue") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+genres_per_movie
 ```
 
 
