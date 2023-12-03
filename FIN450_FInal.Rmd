@@ -303,6 +303,8 @@ write.xlsx(combined_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/
 
 library(lubridate)
 library(readxl)
+library(dplyr)
+library(tidyr)
 url <- "https://raw.githubusercontent.com/nteglauer/FIN450-Final/master/combined_df.xlsx"
 download.file(url, destfile = "combined_df.xlsx", mode = "wb")
 combined_all <- read_excel("combined_df.xlsx")
@@ -335,9 +337,17 @@ df <- temp[, -15] %>%
                 Genres = strsplit(Genres, "\r\n[[:space:]]*\\r\\n"),
                 Genres = sapply(Genres, function(x) paste(trimws(x), collapse = ", "))) %>%
                 dplyr::select(-c(`Running Time`, Hours, Minutes)) %>% 
+  
   dplyr::filter(!grepl("Re-release", Title, ignore.case = TRUE))
 
+df <- df %>%
+  dplyr::mutate("Release Month" = month(`Earliest Release Date`, label = TRUE)) %>%
+  dplyr::mutate(`Release Month` = as.character(`Release Month`)) %>%
+  mutate(`First Genre` = sapply(strsplit(Genres, ", "), `[`, 1)) %>%
+  mutate(count_genres = str_count(Genres, ", ") + 1)
 df
+
+
 ```
 
 ```{r import economic data}
@@ -565,13 +575,13 @@ df_train <- rsample::training(df_split)
 df_test  <- rsample::testing(df_split)
 
 # Worldwide as dependent variable
-recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_train) %>%
+recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = df_train) %>%
   # step_rm(date) %>%
   recipes::prep()
 
 train_baked <- recipes::bake(recipe_pipeline, df_train)
 
-recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_test) %>%
+recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = df_test) %>%
   # step_rm(date) %>%
   recipes::prep()
 
@@ -587,7 +597,7 @@ test_baked$Distributor <- factor(test_baked$Distributor, levels = common_levels_
 # Modeling
 model <- parsnip::decision_tree(mode = "regression") %>%
   parsnip::set_engine("rpart") %>%
-  parsnip::fit(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = train_baked)
+  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = train_baked)
 model
 
 test_predictions <- predict(model, new_data = test_baked)
@@ -614,5 +624,54 @@ res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
   labs(title = "Prediction vs Actual",
        subtitle = "Decision Tree - Regression")
 
+# Assuming 'model' is your decision tree model and 'df_test' is your testing data
+library(parsnip)
+library(yardstick)
+library(vip)
+
+# Assess variable importance
+importance <- model %>% vip()
+
+# Assess variable relationships
+plot(importance)
+
 
 ```
+
+```{r}
+
+# Example: Create a data frame for prediction
+unreleased_movie_data <- data.frame(
+  Budget = 90000000,  # Replace with the actual budget value
+  Distributor = "Lions Gate Studios",  # Replace with the actual distributor value
+  `Release Month` = "Jan",  # Replace with the actual release month value
+  MPAA = "PG",  # Replace with the actual MPAA rating value
+  `Run Time (Mins)` = 1,
+  `First Genre` = "Comedy",
+  `count_genres` =0# Replace with the actual run time value
+)
+
+library(dplyr)
+
+# Example: Rename columns in the tibble
+unreleased_movie_data <- unreleased_movie_data %>%
+  dplyr::rename(
+    Budget = Budget,
+    Distributor = Distributor,
+    `Release Month` = `Release.Month`,
+    MPAA = MPAA,
+    `Run Time (Mins)` = `Run.Time..Mins.`,
+    `First Genre` = `First.Genre`
+  )
+
+
+unreleased_movie_data
+
+unreleased_movie_baked <- recipes::bake(recipe_pipeline, unreleased_movie_data)
+prediction <- predict(model, unreleased_movie_baked)
+
+print(prediction)
+
+
+```
+
