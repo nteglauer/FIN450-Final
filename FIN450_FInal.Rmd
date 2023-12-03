@@ -501,68 +501,6 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
-```{r regression tree analysis}
-
-library(dplyr)
-library(parsnip)
-library(ggplot2)
-# Split data
-set.seed(123)  # Set a seed for reproducibility
-#df_shuffled <- df[sample(nrow(df)), ] # Shuffle data to elimate some bias hopefully/
-df_split <- df %>% rsample::initial_split(prop = 0.80)
-df_train <- rsample::training(df_split)
-df_test  <- rsample::testing(df_split)
-
-# Worldwide as dependent variable
-recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_train) %>%
-  # step_rm(date) %>%
-  recipes::prep()
-train_baked <- recipes::bake(recipe_pipeline, df_train)
-
-recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_test) %>%
-  # step_rm(date) %>%
-  recipes::prep()
-test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
-
-
-common_levels_distributor <- intersect(levels(train_baked$Distributor), levels(test_baked$Distributor))
-train_baked$Distributor <- factor(train_baked$Distributor, levels = common_levels_distributor)
-test_baked$Distributor <- factor(test_baked$Distributor, levels = common_levels_distributor)
-
-
-
-# Modeling
-model <- parsnip::decision_tree(mode = "regression") %>%
-  parsnip::set_engine("rpart") %>%
-  parsnip::fit(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = train_baked)
-model
-
-test_predictions <- predict(model, new_data = test_baked)
-test_predictions
-
-
-# Plot tree
-library(rpart.plot)
-rpart.plot(
-  model$fit,
-  roundint = F,
-  cex = 1,
-  fallen.leaves = F,
-  extra = "auto",
-  main = "Regression Tree"
-)
-
-# Results
-res <- model %>% predict(new_data = test_baked) %>%
-  bind_cols(test_baked %>% dplyr::select(Worldwide))
-res %>% yardstick::metrics(truth = Worldwide, estimate = .pred)
-
-res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
-  labs(title = "Prediction vs Actual",
-       subtitle = "Decision Tree - Regression")
-
-```
-
 ```{r Cast Analysis}
 cast <- df %>% 
   dplyr::select(Title, Worldwide, Cast) %>% 
@@ -612,3 +550,68 @@ star_plot <- star %>%
 plotly::ggplotly(star_plot, tooltip = "text")
 ```
 
+MACHINE LEARNING
+
+```{r regression tree analysis}
+
+library(dplyr)
+library(parsnip)
+library(ggplot2)
+# Split data
+set.seed(123)  # Set a seed for reproducibility
+#df_shuffled <- df[sample(nrow(df)), ] # Shuffle data to elimate some bias hopefully/
+df_split <- df %>% rsample::initial_split(prop = 0.80)
+df_train <- rsample::training(df_split)
+df_test  <- rsample::testing(df_split)
+
+# Worldwide as dependent variable
+recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_train) %>%
+  # step_rm(date) %>%
+  recipes::prep()
+
+train_baked <- recipes::bake(recipe_pipeline, df_train)
+
+recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_test) %>%
+  # step_rm(date) %>%
+  recipes::prep()
+
+test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
+
+
+common_levels_distributor <- intersect(levels(train_baked$Distributor), levels(test_baked$Distributor))
+train_baked$Distributor <- factor(train_baked$Distributor, levels = common_levels_distributor)
+test_baked$Distributor <- factor(test_baked$Distributor, levels = common_levels_distributor)
+
+
+
+# Modeling
+model <- parsnip::decision_tree(mode = "regression") %>%
+  parsnip::set_engine("rpart") %>%
+  parsnip::fit(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = train_baked)
+model
+
+test_predictions <- predict(model, new_data = test_baked)
+test_predictions
+
+
+# Plot tree
+library(rpart.plot)
+rpart.plot(
+  model$fit,
+  roundint = F,
+  cex = 1,
+  fallen.leaves = F,
+  extra = "auto",
+  main = "Regression Tree"
+)
+
+# Results
+res <- model %>% predict(new_data = test_baked) %>%
+  bind_cols(test_baked %>% dplyr::select(Worldwide))
+res %>% yardstick::metrics(truth = Worldwide, estimate = .pred)
+
+res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
+  labs(title = "Prediction vs Actual",
+       subtitle = "Decision Tree - Regression")
+
+```
