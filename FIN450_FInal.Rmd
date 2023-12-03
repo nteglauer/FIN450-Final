@@ -560,6 +560,7 @@ res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
   labs(title = "Prediction vs Actual",
        subtitle = "Decision Tree - Regression")
 
+
 ```
 
 
