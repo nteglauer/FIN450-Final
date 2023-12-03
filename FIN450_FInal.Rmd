@@ -18,7 +18,7 @@ library(rvest)
 library(openxlsx)
 library(kableExtra)
 library(broom)
-
+library(plotly)
 
 ```
 
@@ -326,6 +326,7 @@ df <- temp[, -15] %>%
                 `% Domestic` = as.numeric(parse_number(`% Domestic`)) / 100,
                 `% Foreign` = as.numeric(parse_number(`% Foreign`)) / 100,
                 `Earliest Release Date` = mdy(str_extract(`Earliest Release Date`, "[A-Za-z]+ [0-9]+, [0-9]+")),
+                Star = str_split(Cast, ", ") %>% map_chr(1),
                 Hours = as.numeric(str_extract(`Running Time`, "\\d+(?= hr)")),
                 Minutes = as.numeric(str_extract(`Running Time`, "\\d+(?= min)")),
                 Hours = ifelse(is.na(Hours), 0, Hours),
@@ -500,6 +501,57 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
+```{r Cast Analysis}
+cast <- df %>% 
+  dplyr::select(Title, Worldwide, Cast) %>% 
+  tidyr::separate_rows(Cast, sep = ", ") %>% 
+  dplyr::group_by(Cast) %>% 
+  dplyr::summarise(AvgRev = mean(Worldwide),
+                   Count = n()) %>% 
+  dplyr::mutate(Movies_Acted = case_when(
+    Count >= 5 & Count <= 10 ~ '5-10',
+    Count > 10 & Count <= 15 ~ '10-15',
+    Count > 15 & Count <= 20 ~ '15-20',
+    Count > 20 ~ '20+',
+    TRUE ~ 'Less than 5'
+  )) %>% 
+  dplyr::group_by(Movies_Acted) %>% 
+  dplyr::summarise(AvgRev = mean(AvgRev),
+                   Count = n()) %>% 
+  dplyr::arrange(desc(AvgRev))
+cast
+# Changing preference for newer faces or different types of story telling. Still like regulars 
+range_order <- c("Less than 5", "5-10", "10-15", "15-20", "20+")
+cast$Movies_Acted <- factor(cast$Movies_Acted, levels = range_order)
+ggplot(cast, aes(x = Movies_Acted, y = AvgRev, fill = factor(Count))) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_viridis_d() +
+  labs(title = "Average Revenue by Number of Movies Acted",
+       x = "Movies_Acted",
+       y = "Average Revenue",
+       fill = "Count") +
+  theme_minimal()
+star <- df %>% 
+  dplyr::select(Worldwide, Star) %>% 
+  dplyr::group_by(Star) %>% 
+  dplyr::summarise(AvgRev = mean(Worldwide),
+                   Count = n()) %>% 
+  dplyr::filter(Count >= 5) %>% 
+  dplyr::arrange(desc(AvgRev))
+star
+star_plot <- star %>%  
+  ggplot(aes(x = Count, y = AvgRev, size = Count, color = Count,
+             text = paste("Star:", Star, "<br>Number of Movies:", Count, "<br>Average Revenue:", scales::dollar(AvgRev)))) +
+  geom_point() +
+  labs(title = "Movie Stars and Avg Revenue",
+       x = "Number of Movies",
+       y = "Average Revenue",
+       size = "Number of Movies")
+plotly::ggplotly(star_plot, tooltip = "text")
+```
+
+MACHINE LEARNING
+
 ```{r regression tree analysis}
 
 library(dplyr)
@@ -516,11 +568,13 @@ df_test  <- rsample::testing(df_split)
 recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_train) %>%
   # step_rm(date) %>%
   recipes::prep()
+
 train_baked <- recipes::bake(recipe_pipeline, df_train)
 
 recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Earliest Release Date` + MPAA + `Run Time (Mins)`, data = df_test) %>%
   # step_rm(date) %>%
   recipes::prep()
+
 test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
 
 
@@ -562,6 +616,3 @@ res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
 
 
 ```
-
-
-
