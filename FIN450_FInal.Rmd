@@ -19,10 +19,16 @@ library(openxlsx)
 library(kableExtra)
 library(broom)
 library(plotly)
+library(rstanarm)
+library(parsnip)
+library(tidymodels)
+library(rsample)
+library(recipes)
+library(yardstick)
 
 ```
 
-```{r remDr Start}
+```{r remDr Start, eval=FALSE, include=FALSE}
 # Start the server
 rs_driver_object <- rsDriver(browser = "firefox",
                              chromever = NULL,
@@ -33,7 +39,7 @@ rs_driver_object <- rsDriver(browser = "firefox",
 remDr <- rs_driver_object$client
 ```
 
-```{r scraping new release}
+```{r scraping new release, eval=FALSE, include=FALSE}
 library(rvest)
 library(stringr)
 library(dplyr)
@@ -80,7 +86,7 @@ print(new_movies_df)
 
 ```
 
-```{r Revenue For the top movies_per_page movies of each year from 2024 - num_pages}
+```{r Revenue For the top movies_per_page movies of each year from 2024 - num_pages, eval=FALSE, include=FALSE}
 
 #Scrapes the revenue of each movie flipping through each year.
 scrape_revenue_data <- function(num_pages) {
@@ -115,7 +121,7 @@ scrape_revenue_data <- function(num_pages) {
 
 ```
 
-```{r Extract Movie Specific Data}
+```{r Extract Movie Specific Data, eval=FALSE, include=FALSE}
 
 #Scrapes the Movie specific data, returns a wide df of the movie's data
 extract_movie_data <- function(webpage, title) {
@@ -196,7 +202,7 @@ extract_movie_data <- function(webpage, title) {
 
 ```
 
-```{r Flip through Movies within each Year and Aggregate}
+```{r Flip through Movies within each Year and Aggregate, eval=FALSE, include=FALSE}
 
 # Flips through each Movie within each Year and aggregates the specific year's movie data
 scrape_movie_data <- function(movie_titles) {
@@ -228,7 +234,7 @@ scrape_movie_data <- function(movie_titles) {
 
 ```
 
-```{r Flip through Each year and Aggregate each year's movie data}
+```{r Flip through Each year and Aggregate each year's movie data, eval=FALSE, include=FALSE}
 
 #Flips through each year and aggregates all year's data
 scrape_and_aggregate_data <- function(num_pages, movies_per_page, movie_titles) {
@@ -259,7 +265,7 @@ scrape_and_aggregate_data <- function(num_pages, movies_per_page, movie_titles) 
 }
 ```
 
-```{r MAIN}
+```{r MAIN, eval=FALSE, include=FALSE}
 website <- 'https://www.boxofficemojo.com/'
 remDr$open()
 remDr$navigate(website)
@@ -299,7 +305,7 @@ combined_df
 write.xlsx(combined_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
 ```
 
-```{r Data Wrangling and Parsing}
+```{r Data Wrangling and Parsing, include=FALSE}
 
 library(lubridate)
 library(readxl)
@@ -400,7 +406,22 @@ REPORT LAYOUT:
 - Analysis of factors affecting revenue 
 - ML and prediction of select movies
 
-```{r Movie Revenue Trends over Time}
+# **Executive Summary**
+1. 
+2.
+3.
+4.
+
+## **Project Framework: Definition and Methodology**
+In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced examination of critical determinants such as the expertise of the cast and crew. By scrutinizing these diverse components, the report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
+
+The data was obtained through the use of our own web scraping algorithm and covers the top 75 grossing movies over the past 25 years.
+ 
+ 
+## **Temporal Analysis**
+The average revenue earned over time shows a very clear increasing trend. An important observation to note is the rate at which Foreign revenue grows in relation to Domestic revenue. The growth in worldwide revenue can be attributed to the rapid growth in average foreign revenue.
+
+```{r Movie Revenue Trends over Time, echo=FALSE, warning=FALSE}
 
 revenue <- df %>% 
   dplyr::select(Title, Worldwide, Domestic, Foreign,`Domestic Opening`, `Earliest Release Date`, Year) %>% 
@@ -672,6 +693,95 @@ prediction <- predict(model, unreleased_movie_baked)
 
 print(prediction)
 
+
+```
+
+```{r}
+# Sampling
+df_split2 <- df %>% rsample::initial_time_split(prop = 0.80)
+df_train2 <- rsample::training(df_split2)
+df_test2 <- rsample::testing(df_split2)
+
+# Training Data
+recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget + 
+                                      Distributor + 
+                                      `Earliest Release Date` + 
+                                      MPAA + 
+                                      `Run Time (Mins)` + 
+                                      Star, 
+                                    data = df_train2) %>%
+  recipes::step_mutate(Budget_Category = cut(Budget, 
+                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
+                                     labels = c("Small", "Medium", "Large"))) %>% 
+  step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
+  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
+  step_rm(`Run Time (Mins)`, `Earliest Release Date`, Budget) %>% 
+  recipes::prep()
+
+train_baked2 <- recipes::bake(recipe_pipeline2, df_train2)
+
+#Testing Data
+recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget + 
+                                      Distributor + 
+                                      `Earliest Release Date` + 
+                                      MPAA + 
+                                      `Run Time (Mins)` +
+                                      Star, 
+                                    data = df_test2) %>%
+  recipes::step_mutate(Budget_Category = cut(Budget, 
+                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
+                                     labels = c("Small", "Medium", "Large"))) %>% 
+  step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
+  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
+  step_rm(`Run Time (Mins)`, `Earliest Release Date`, Budget) %>% 
+  recipes::prep()
+
+test_baked2 <- recipes::bake(recipe_pipeline2, df_test2)
+
+common_levels_distributor2 <- intersect(levels(train_baked2$Distributor), levels(test_baked2$Distributor))
+train_baked2$Distributor <- factor(train_baked2$Distributor, levels = common_levels_distributor2)
+test_baked2$Distributor <- factor(test_baked2$Distributor, levels = common_levels_distributor2)
+
+common_levels_star <- intersect(levels(train_baked2$Star), levels(test_baked2$Star))
+
+# Update levels in both training and testing data
+train_baked2$Star <- factor(train_baked2$Star, levels = common_levels_star)
+test_baked2$Star <- factor(test_baked2$Star, levels = common_levels_star)
+
+# MODEL
+lm_fit <- parsnip::linear_reg(mode = "regression") %>%
+  parsnip::set_engine("lm") %>%
+  parsnip::fit(Worldwide ~ ., data = train_baked2)
+
+# Make predictions on the test data
+lm_predictions <- predict(lm_fit, new_data = test_baked2) %>%
+  bind_cols(truth = df_test2$Worldwide)
+
+# Calculate performance metrics
+lm_metrics <- lm_predictions %>%
+  metrics(truth = truth, estimate = .pred)
+
+# Extract specific metrics
+mae <- lm_metrics$mae
+rmse <- sqrt(lm_metrics$mse)
+rsq <- lm_metrics$r.squared
+
+# Create a table
+metrics_table <- tibble::tibble(
+  Model = "Linear Regression",
+  MAE = mae,
+  RMSE = rmse,
+  R_squared = rsq
+)
+
+# Print the table
+print(metrics_table)
+
+test <- df %>% 
+  dplyr::group_by(Distributor) %>% 
+  dplyr::summarise(count = n()) %>% 
+  dplyr::arrange(desc(count))
+test
 
 ```
 
