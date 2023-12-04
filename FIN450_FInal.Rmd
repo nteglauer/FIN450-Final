@@ -26,6 +26,7 @@ library(rsample)
 library(recipes)
 library(yardstick)
 
+
 ```
 
 ```{r remDr Start, eval=FALSE, include=FALSE}
@@ -419,7 +420,9 @@ The data was obtained through the use of our own web scraping algorithm and cove
  
  
 ## **Temporal Analysis**
-The average revenue earned over time shows a very clear increasing trend. An important observation to note is the rate at which Foreign revenue grows in relation to Domestic revenue. The growth in worldwide revenue can be attributed to the rapid growth in average foreign revenue.
+Over time, the average revenue demonstrates a distinct upward trend, with a notable observation regarding the rate of growth in Foreign revenue compared to Domestic revenue. The surge in global revenue is primarily driven by the rapid expansion of foreign revenue, highlighting the escalating growth and acceptance of Western films in international markets.
+
+The onset of the Covid-19 Pandemic significantly impacted the film industry, evident in the graph. Productions were halted, and theaters closed, leading to a substantial loss of earning potential. The lockdown measures globally disrupted filming schedules, postponed releases, and the closure of theaters eliminated a crucial avenue for revenue. This had a ripple effect across the industry, affecting filmmakers, actors, crew members, distributors, and exhibitors. The industry's vulnerability to external shocks became apparent, prompting the need for innovative adaptations to navigate the challenges such as online releases.
 
 ```{r Movie Revenue Trends over Time, echo=FALSE, warning=FALSE}
 
@@ -432,17 +435,26 @@ revenue <- df %>%
                    Avg_Domestic = mean(Domestic),
                    Avg_Foreign = mean(Foreign))
 
+
 revenue_plot <- revenue %>% 
   ggplot(aes(x = Year)) +
   geom_line(aes(y = Avg_Worldwide, color = "Avg Worldwide"), size = 1) +
   geom_line(aes(y = Avg_Domestic, color = "Avg Domestic"), size = 1) +
   geom_line(aes(y = Avg_Foreign, color = "Avg Foreign"), size = 1) +
+  
+  # Add linear regression lines up to a specific date
+  geom_smooth(data = . %>% filter(Year <= 2019),
+              aes(y = Avg_Domestic), method = "lm", se = FALSE, linetype = "dashed", color = "black") +
+  geom_smooth(data = . %>% filter(Year <= 2019),
+              aes(y = Avg_Foreign), method = "lm", se = FALSE, linetype = "dashed", color = "black") +
+  
   labs(title = "Avg Revenue Over Time",
        x = "Release Date",
        y = "Revenue (in millions)",
        color = "Revenue Type") +
   theme_minimal()
-  
+
+
 revenue_plot
 
 ```
@@ -450,7 +462,7 @@ revenue_plot
 ```{r Release Month Analysis}
 
 release_month <- df %>% 
-  dplyr::select(Title, Worldwide, `Earliest Release Date`) %>% 
+  dplyr::select(Title, Worldwide, `Earliest Release Date`, Genres) %>% 
   dplyr::mutate(Month = month(`Earliest Release Date`, label = TRUE))
 
 release_month_plot <- release_month %>% 
@@ -468,6 +480,15 @@ release_month_anova <- aov(Worldwide ~ Month, data = release_month)
 anova_table <- kable(tidy(release_month_anova)) %>% 
   kable_styling(bootstrap_options = "striped", full_width = FALSE)
 anova_table
+
+release_genre <- release_month %>% 
+  tidyr::separate_rows(Genres, sep = ", ") %>% 
+  dplyr::group_by(Month, Genres) %>% 
+  dplyr::summarise(MedianRev = median(Worldwide),
+                   Count = n()) %>% 
+  dplyr::arrange(desc(MedianRev))
+
+release_genre
 ```
 
 ```{r Genre Analysis}
@@ -487,14 +508,13 @@ genre_plot <- genre %>%
   
 genre_plot
 
-# Used Median b/c of presence of outliers
 genre_summary <- genre %>%
   group_by(Genres) %>%
-  summarise(Median_Revenue = median(Worldwide, na.rm = TRUE)) %>%
-  arrange(desc(Median_Revenue)) %>% 
+  summarise(Avg_Revenue = mean(Worldwide, na.rm = TRUE)) %>%
+  arrange(desc(Avg_Revenue)) %>% 
   head(10) %>% 
   kbl(caption = "Top 10 Genres by Revenue",
-      col.names = c("Genre", "Median Revenue")) %>% 
+      col.names = c("Genre", "Avg Revenue")) %>% 
   kable_classic(full_width = F, html_font = "Times New Roman")
 
 
@@ -518,14 +538,14 @@ genres_per_movie <- df %>%
   dplyr::select(Title, Worldwide, Genres) %>% 
   dplyr::mutate(Genre_Count = str_count(Genres, ",") + 1) %>% 
   dplyr::group_by(Genre_Count) %>% 
-  dplyr::summarise(Median_rev = median(Worldwide),
+  dplyr::summarise(Avg_rev = mean(Worldwide),
                    Movie_Count = n()) %>% 
-  ggplot(aes(x = factor(Genre_Count), y = Median_rev, fill = factor(Genre_Count))) +
+  ggplot(aes(x = factor(Genre_Count), y = Avg_rev, fill = factor(Genre_Count))) +
   geom_bar(stat = "identity", position = "dodge") +
   geom_text(aes(label = Movie_Count), vjust = -0.5) +  # Display movie count on top of bars
-  labs(title = "Median Revenue by Number of Genres and Number of Movies",
+  labs(title = "Avg Revenue by Number of Genres and Number of Movies",
        x = "Number of Genres",
-       y = "Median Revenue") +
+       y = "Avg Revenue") +
   theme_minimal() +
   theme(legend.position = "none")
 
@@ -663,13 +683,13 @@ plot(importance)
 
 # Example: Create a data frame for prediction
 unreleased_movie_data <- data.frame(
-  Budget = 90000000,  # Replace with the actual budget value
-  Distributor = "Lions Gate Studios",  # Replace with the actual distributor value
-  `Release Month` = "Jan",  # Replace with the actual release month value
-  MPAA = "PG",  # Replace with the actual MPAA rating value
-  `Run Time (Mins)` = 1,
-  `First Genre` = "Comedy",
-  `count_genres` =0# Replace with the actual run time value
+  Budget = 160000000,  # Replace with the actual budget value
+  Distributor = "Lions Gate Films",  # Replace with the actual distributor value
+  `Release Month` = "Nov",  # Replace with the actual release month value
+  MPAA = "PG-13",  # Replace with the actual MPAA rating value
+  `Run Time (Mins)` = 137,
+  `First Genre` = "Action",
+  `count_genres` = 4,
 )
 
 library(dplyr)
@@ -698,9 +718,8 @@ print(prediction)
 
 ```{r}
 # Sampling
-df_split2 <- df %>% rsample::initial_time_split(prop = 0.80)
+df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
 df_train2 <- rsample::training(df_split2)
-df_test2 <- rsample::testing(df_split2)
 
 # Training Data
 recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget + 
@@ -715,67 +734,35 @@ recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget +
                                      labels = c("Small", "Medium", "Large"))) %>% 
   step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
   step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
-  step_rm(`Run Time (Mins)`, `Earliest Release Date`, Budget) %>% 
+  step_dummy(Star, one_hot = TRUE) %>%
   recipes::prep()
 
 train_baked2 <- recipes::bake(recipe_pipeline2, df_train2)
-
-#Testing Data
-recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget + 
-                                      Distributor + 
-                                      `Earliest Release Date` + 
-                                      MPAA + 
-                                      `Run Time (Mins)` +
-                                      Star, 
-                                    data = df_test2) %>%
-  recipes::step_mutate(Budget_Category = cut(Budget, 
-                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
-                                     labels = c("Small", "Medium", "Large"))) %>% 
-  step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
-  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
-  step_rm(`Run Time (Mins)`, `Earliest Release Date`, Budget) %>% 
-  recipes::prep()
-
-test_baked2 <- recipes::bake(recipe_pipeline2, df_test2)
-
-common_levels_distributor2 <- intersect(levels(train_baked2$Distributor), levels(test_baked2$Distributor))
-train_baked2$Distributor <- factor(train_baked2$Distributor, levels = common_levels_distributor2)
-test_baked2$Distributor <- factor(test_baked2$Distributor, levels = common_levels_distributor2)
-
-common_levels_star <- intersect(levels(train_baked2$Star), levels(test_baked2$Star))
-
-# Update levels in both training and testing data
-train_baked2$Star <- factor(train_baked2$Star, levels = common_levels_star)
-test_baked2$Star <- factor(test_baked2$Star, levels = common_levels_star)
 
 # MODEL
 lm_fit <- parsnip::linear_reg(mode = "regression") %>%
   parsnip::set_engine("lm") %>%
   parsnip::fit(Worldwide ~ ., data = train_baked2)
 
-# Make predictions on the test data
-lm_predictions <- predict(lm_fit, new_data = test_baked2) %>%
-  bind_cols(truth = df_test2$Worldwide)
-
-# Calculate performance metrics
-lm_metrics <- lm_predictions %>%
-  metrics(truth = truth, estimate = .pred)
-
-# Extract specific metrics
-mae <- lm_metrics$mae
-rmse <- sqrt(lm_metrics$mse)
-rsq <- lm_metrics$r.squared
-
-# Create a table
-metrics_table <- tibble::tibble(
-  Model = "Linear Regression",
-  MAE = mae,
-  RMSE = rmse,
-  R_squared = rsq
+# PREDICTION
+new_data <- tibble::tibble(
+  Budget = 97000000,  # Replace with your budget value
+  Distributor = "Twentieth Century Fox",  # Replace with your distributor
+  `Earliest Release Date` = as.Date("2017-03-17"),  # Replace with your release date
+  MPAA = "R",  # Replace with your MPAA rating
+  `Run Time (Mins)` = 137,  # Replace with your run time
+  Star = "Hugh Jackman"  # Replace with your star value
 )
 
-# Print the table
-print(metrics_table)
+
+# Bake the new data using the same recipe
+new_data_baked <- recipes::bake(recipe_pipeline2, new_data)
+
+# Make predictions using the trained model
+predictions <- predict(lm_fit, new_data_baked)
+
+# View the predicted worldwide revenue
+predictions
 
 test <- df %>% 
   dplyr::group_by(Distributor) %>% 
