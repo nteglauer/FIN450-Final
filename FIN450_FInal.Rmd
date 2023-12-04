@@ -25,7 +25,7 @@ library(tidymodels)
 library(rsample)
 library(recipes)
 library(yardstick)
-
+library(arrow)
 
 ```
 
@@ -303,7 +303,7 @@ combined_df <- cbind(rev_df, movie_df)
 combined_df
 
 # Change File Location to save data
-write.xlsx(combined_df, 'C:/Users/jamie/OneDrive/School/FALL 2023/FIN 450/Final/FIN450-Final/scraped_data.xlsx', rowNames = FALSE)
+arrow::write_feather(combined_df, 'FIN450_Final.feather')
 ```
 
 ```{r Data Wrangling and Parsing, include=FALSE}
@@ -312,10 +312,8 @@ library(lubridate)
 library(readxl)
 library(dplyr)
 library(tidyr)
-url <- "https://raw.githubusercontent.com/nteglauer/FIN450-Final/master/combined_df.xlsx"
-download.file(url, destfile = "combined_df.xlsx", mode = "wb")
-combined_all <- read_excel("combined_df.xlsx")
 
+combined_all <- arrow::read_feather('FIN450_Final.feather')
 
 
 temp <- combined_all %>% 
