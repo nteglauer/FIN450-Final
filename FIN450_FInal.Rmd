@@ -8,7 +8,7 @@ date: "2023-11-24"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r Libraries}
+```{r Libraries, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
 library(RSelenium)
 library(netstat)
@@ -26,6 +26,8 @@ library(rsample)
 library(recipes)
 library(yardstick)
 library(arrow)
+library(feasts)
+library(patchwork)
 
 ```
 
@@ -235,7 +237,7 @@ scrape_movie_data <- function(movie_titles) {
 
 ```
 
-```{r Flip through Each year and Aggregate each year's movie data, eval=FALSE, include=FALSE}
+```{r "Flip through Each year and Aggregate each year's movie data", eval=FALSE, include=FALSE}
 
 #Flips through each year and aggregates all year's data
 scrape_and_aggregate_data <- function(num_pages, movies_per_page, movie_titles) {
@@ -355,7 +357,7 @@ df
 
 ```
 
-```{r import economic data}
+```{r import economic data, include=FALSE}
 
 library(tidyr)
 library(tidyquant)
@@ -422,7 +424,7 @@ Over time, the average revenue demonstrates a distinct upward trend, with a nota
 
 The onset of the Covid-19 Pandemic significantly impacted the film industry, evident in the graph. Productions were halted, and theaters closed, leading to a substantial loss of earning potential. The lockdown measures globally disrupted filming schedules, postponed releases, and the closure of theaters eliminated a crucial avenue for revenue. This had a ripple effect across the industry, affecting filmmakers, actors, crew members, distributors, and exhibitors. The industry's vulnerability to external shocks became apparent, prompting the need for innovative adaptations to navigate the challenges such as online releases.
 
-```{r Movie Revenue Trends over Time, echo=FALSE, warning=FALSE}
+```{r Movie Revenue Trends over Time, echo=FALSE, message=FALSE, warning=FALSE}
 
 revenue <- df %>% 
   dplyr::select(Title, Worldwide, Domestic, Foreign,`Domestic Opening`, `Earliest Release Date`, Year) %>% 
@@ -457,11 +459,19 @@ revenue_plot
 
 ```
 
-```{r Release Month Analysis}
+The impact of the month of film release is a fascinating observation. Notably, films hitting the screens in May and June consistently outperform those released in other months. Utilizing an analysis of variance (ANOVA) shows a significant disparity in average revenue across different release months. Several factors contribute to this phenomenon:
+
+1. Summer Blockbuster Season: May and June fall within the traditional summer movie season in numerous regions. Studios strategically unveil high-budget blockbuster films during this period, targeting a broad audience. The warmer weather and school vacations further boost movie attendance.
+
+2. Strategic Release Patterns: The film industry acknowledges this pattern, leading to a clustering effect. Recognizing the advantageous months, more popular and anticipated films tend to be strategically released during May and June. This intentional scheduling capitalizes on the observed heightened audience engagement during these months.
+
+3. Genre Preferences: Certain movie genres, such as action, adventure, and fantasy, are often associated with May and June releases as seen in the graph. These genres tend to draw larger audiences and generate higher revenue, contributing to the observed pattern.
+```{r Release Month Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 release_month <- df %>% 
   dplyr::select(Title, Worldwide, `Earliest Release Date`, Genres) %>% 
-  dplyr::mutate(Month = month(`Earliest Release Date`, label = TRUE))
+  dplyr::mutate(Month = month(`Earliest Release Date`, label = TRUE)) %>% 
+  dplyr::filter(`Earliest Release Date` >= "1999-01-01")
 
 release_month_plot <- release_month %>% 
   dplyr::group_by(Month) %>% 
@@ -469,9 +479,29 @@ release_month_plot <- release_month %>%
   ggplot(aes(x = Month, y = AvgRevenue, fill = Month)) +
     geom_bar(stat = "identity") +
     labs(title = "Average Revenue by Release Month", x = "Release Month", y = "Average Revenue") +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 
-release_month_plot
+release_genre <- release_month %>% 
+  tidyr::separate_rows(Genres, sep = ", ") %>% 
+  dplyr::group_by(Month, Genres) %>% 
+  dplyr::summarise(MedianRev = median(Worldwide),
+                   Count = n()) %>% 
+  dplyr::arrange(desc(MedianRev)) %>% 
+  dplyr::filter(Count >= 5) %>% 
+  head(10) %>% 
+  ggplot(aes(x = factor(Genres, levels = unique(Genres)), y = MedianRev, fill = Month)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Median Revenues by Month and Genre",
+       subtitle = "Top 10 (Genres with at least 5 movies)",
+       x = "Genres",
+       y = "Median Revenue",
+       fill = "Month") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  scale_fill_brewer(palette = "Set1")
+
+release_month_plot | release_genre
 
 # Anova Analysis shows low P value: there are significant differences in the average revenue across different months of movie releases. 
 release_month_anova <- aov(Worldwide ~ Month, data = release_month)
@@ -479,15 +509,28 @@ anova_table <- kable(tidy(release_month_anova)) %>%
   kable_styling(bootstrap_options = "striped", full_width = FALSE)
 anova_table
 
-release_genre <- release_month %>% 
-  tidyr::separate_rows(Genres, sep = ", ") %>% 
-  dplyr::group_by(Month, Genres) %>% 
-  dplyr::summarise(MedianRev = median(Worldwide),
-                   Count = n()) %>% 
-  dplyr::arrange(desc(MedianRev))
-
-release_genre
 ```
+
+```{r Release Month Seasonality}
+
+month_seasonality <- release_month %>% 
+  dplyr::select(-Genres, -Title) %>% 
+  dplyr::arrange(`Earliest Release Date`) %>%
+  dplyr::group_by(`Earliest Release Date`) %>% 
+  dplyr::summarise(Revenue = mean(Worldwide))
+
+ts <- as_tsibble(month_seasonality, index = `Earliest Release Date`) %>% 
+  tsibble::group_by_key() %>%
+  tsibble::index_by(freq = ~ yearmonth(.)) %>%
+  dplyr::summarise(value = mean(Revenue), .groups = c("keep")) %>% 
+  tsibble::fill_gaps()
+
+ts %>% feasts::gg_subseries(value)
+
+ts %>% 
+  fabletools::features(value, feasts::feat_stl)
+```
+
 
 ```{r Genre Analysis}
 
@@ -677,7 +720,7 @@ plot(importance)
 
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 # Example: Create a data frame for prediction
 unreleased_movie_data <- data.frame(
@@ -714,7 +757,7 @@ print(prediction)
 
 ```
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 # Sampling
 df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
 df_train2 <- rsample::training(df_split2)
