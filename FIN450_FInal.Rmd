@@ -414,7 +414,7 @@ REPORT LAYOUT:
 4.
 
 ## **Project Framework: Definition and Methodology**
-In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced examination of critical determinants such as the expertise of the cast and crew. By scrutinizing these diverse components, the report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
+In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced examination of critical determinants such as the expertise of the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
 
 The data was obtained through the use of our own web scraping algorithm and covers the top 75 grossing movies over the past 25 years.
  
@@ -465,7 +465,7 @@ The impact of the month of film release is a fascinating observation. Notably, f
 
 2. Strategic Release Patterns: The film industry acknowledges this pattern, leading to a clustering effect. Recognizing the advantageous months, more popular and anticipated films tend to be strategically released during May and June. This intentional scheduling capitalizes on the observed heightened audience engagement during these months.
 
-3. Genre Preferences: Certain movie genres, such as action, adventure, and fantasy, are often associated with May and June releases as seen in the graph. These genres tend to draw larger audiences and generate higher revenue, contributing to the observed pattern.
+3. Genre Preferences: Certain movie genres, such as action, adventure, and fantasy, are often associated with May and June releases as seen in the graph. These genres tend to draw larger audiences and generate higher revenue, contributing to the observed pattern. (Median Revenue used to account for outliers)
 ```{r Release Month Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 release_month <- df %>% 
@@ -501,12 +501,14 @@ release_genre <- release_month %>%
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   scale_fill_brewer(palette = "Set1")
 
+
+
 release_month_plot | release_genre
 
-# Anova Analysis shows low P value: there are significant differences in the average revenue across different months of movie releases. 
 release_month_anova <- aov(Worldwide ~ Month, data = release_month)
 anova_table <- kable(tidy(release_month_anova)) %>% 
   kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
 anova_table
 
 ```
