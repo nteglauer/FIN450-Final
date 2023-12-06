@@ -414,7 +414,7 @@ REPORT LAYOUT:
 4.
 
 ## **Project Framework: Definition and Methodology**
-In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced examination of critical determinants such as the expertise of the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
+In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced analysis of important factors such as the expertise of the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
 
 The data was obtained through the use of our own web scraping algorithm and covers the top 75 grossing movies over the past 25 years.
  
@@ -513,7 +513,13 @@ anova_table
 
 ```
 
-```{r Release Month Seasonality}
+Another notable observation is the seasonality exhibited in the average revenue over a year. The seasonal strength, quantified by a value of 0.5817723, signifies a substantial recurring pattern within our data set.
+
+This strong seasonality implies that there are recurring trends or patterns in revenue that manifest on an annual basis. It suggests that certain times of the year consistently contribute to increased or decreased revenue. Understanding and leveraging this seasonality can be pivotal for strategic decision-making in the realm of film releases.
+
+In practical terms, this finding prompts a closer examination of the temporal distribution of revenue throughout the year. A more detailed exploration of which months or seasons contribute significantly to high or low average revenues can unveil insights that may guide release strategies, marketing efforts, or resource allocation.
+
+```{r Release Month Seasonality, echo=FALSE, message=FALSE, warning=FALSE}
 
 month_seasonality <- release_month %>% 
   dplyr::select(-Genres, -Title) %>% 
@@ -524,17 +530,20 @@ month_seasonality <- release_month %>%
 ts <- as_tsibble(month_seasonality, index = `Earliest Release Date`) %>% 
   tsibble::group_by_key() %>%
   tsibble::index_by(freq = ~ yearmonth(.)) %>%
-  dplyr::summarise(value = mean(Revenue), .groups = c("keep")) %>% 
+  dplyr::summarise(AvgRevenue = mean(Revenue), .groups = c("keep")) %>% 
   tsibble::fill_gaps()
 
-ts %>% feasts::gg_subseries(value)
+ts %>% feasts::gg_subseries(AvgRevenue)
 
-ts %>% 
-  fabletools::features(value, feasts::feat_stl)
+ts %>%
+  fabletools::features(AvgRevenue, feasts::feat_stl) %>%
+  kable("html") %>%
+  kable_styling()
 ```
 
+## **Film Characteristics and Insights**
 
-```{r Genre Analysis}
+```{r Genre Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 genre <- df %>% 
   dplyr::select(Title, Worldwide, Genres) %>% 
@@ -544,12 +553,10 @@ genre_plot <- genre %>%
   ggplot(aes(x = Genres, y = Worldwide, fill = Genres)) +
   geom_boxplot() +
   coord_flip() +  # To make the plot horizontal for better readability
-  labs(title = "Distribution of Revenue Across Genres",
+  labs(title = "Revenue Across Genres",
        x = "Genres",
        y = "Revenue") +
   theme(legend.position = "none")
-  
-genre_plot
 
 genre_summary <- genre %>%
   group_by(Genres) %>%
@@ -559,9 +566,6 @@ genre_summary <- genre %>%
   kbl(caption = "Top 10 Genres by Revenue",
       col.names = c("Genre", "Avg Revenue")) %>% 
   kable_classic(full_width = F, html_font = "Times New Roman")
-
-
-genre_summary
 
 genre_distribution <- genre %>% 
   dplyr::group_by(Genres) %>% 
@@ -575,8 +579,12 @@ genre_distribution <- genre %>%
   coord_flip() +
   theme(legend.position = "none")
 
-genre_distribution
+genre_plot
+genre_summary
 
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 genres_per_movie <- df %>% 
   dplyr::select(Title, Worldwide, Genres) %>% 
   dplyr::mutate(Genre_Count = str_count(Genres, ",") + 1) %>% 
@@ -594,6 +602,7 @@ genres_per_movie <- df %>%
 
 genres_per_movie
 ```
+
 
 ```{r Cast Analysis}
 cast <- df %>% 
@@ -642,6 +651,39 @@ star_plot <- star %>%
        y = "Average Revenue",
        size = "Number of Movies")
 plotly::ggplotly(star_plot, tooltip = "text")
+```
+
+```{r Writer Analysis}
+#RUN REGRESSION ANALYSIS
+
+writer <- df %>% 
+  dplyr::select(Title, Worldwide, Writer) %>% 
+  stats::na.omit() %>% 
+  dplyr::mutate(Writer_Count = str_count(Writer, ",") + 1) %>%
+  dplyr::mutate(Grouped_Writer_Count = ifelse(Writer_Count >= 10, 10, Writer_Count)) %>%
+  dplyr::group_by(Grouped_Writer_Count) %>% 
+  dplyr::summarise(AvgRevenue = mean(Worldwide),
+                   Count = n())
+
+writer
+
+```
+
+
+```{r Director Analysis}
+# FIND AND GRAPH THE TOP DIRECTORS
+# DIRECTOR GENRE GRAPH
+
+director <- df %>% 
+  dplyr::select(Title, Worldwide, Director) %>% 
+  dplyr::mutate(Director_Count = str_count(Director, ",") + 1) %>% 
+  dplyr::group_by(Director_Count) %>% 
+  dplyr::summarise(AvgRevenue = median(Worldwide),
+                   Count = n()) %>% 
+  dplyr::filter(Count > 2)
+
+director
+
 ```
 
 MACHINE LEARNING
