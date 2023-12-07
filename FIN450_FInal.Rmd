@@ -1,7 +1,9 @@
 ---
 title: "FIN450 Final Assignment"
-output: html_document
-date: "2023-11-24"
+date:
+output: 
+  html_document:
+    runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -29,6 +31,7 @@ library(arrow)
 library(feasts)
 library(patchwork)
 library(corrplot)
+library(shiny)
 
 ```
 
@@ -680,7 +683,6 @@ writer
 
 ```
 
-
 ```{r Director Analysis}
 # FIND AND GRAPH THE TOP DIRECTORS
 # DIRECTOR GENRE GRAPH
@@ -809,27 +811,31 @@ prediction <- predict(model, unreleased_movie_baked)
 
 print(prediction)
 
-
 ```
 
-```{r eval=FALSE, include=FALSE}
+```{r shiny-app, message=FALSE, warning=FALSE}
 # Sampling
 df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
 df_train2 <- rsample::training(df_split2)
 
+df_train2 <- df_train2 %>% 
+  dplyr::mutate(Director_Count = str_count(Director, ",") + 1,
+                Writer_Count = str_count(Writer, ",") + 1,
+                Genres_Count = count_genres,
+                Primary_Genre = `First Genre`)
 # Training Data
 recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget + 
                                       Distributor + 
                                       `Earliest Release Date` + 
                                       MPAA + 
                                       `Run Time (Mins)` + 
-                                      Star, 
+                                      Star + 
+                                      Director_Count + 
+                                      Writer_Count +
+                                      Genres_Count +
+                                      Primary_Genre, 
                                     data = df_train2) %>%
-  recipes::step_mutate(Budget_Category = cut(Budget, 
-                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
-                                     labels = c("Small", "Medium", "Large"))) %>% 
   step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
-  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
   step_dummy(Star, one_hot = TRUE) %>%
   recipes::prep()
 
@@ -840,70 +846,67 @@ lm_fit <- parsnip::linear_reg(mode = "regression") %>%
   parsnip::set_engine("lm") %>%
   parsnip::fit(Worldwide ~ ., data = train_baked2)
 
-# PREDICTION
-new_data <- tibble::tibble(
-  Budget = 97000000,  # Replace with your budget value
-  Distributor = "Twentieth Century Fox",  # Replace with your distributor
-  `Earliest Release Date` = as.Date("2017-03-17"),  # Replace with your release date
-  MPAA = "R",  # Replace with your MPAA rating
-  `Run Time (Mins)` = 137,  # Replace with your run time
-  Star = "Hugh Jackman",
-  Director_Count = 1,
-  Writer_Count = 4
+ui <- fluidPage(
+  titlePanel("Movie Revenue Prediction"),
+  sidebarLayout(
+    sidebarPanel(
+      textInput("budget", "Budget", value = ""),
+      textInput("distributor", "Distributor", value = ""),
+      dateInput("release_date", "Release Date", value = ""),
+      selectInput("mpaa_rating", "MPAA Rating",
+                  choices = c("PG", "PG-13", "R"), selected = "PG-13"),
+      numericInput("director_count", "# of Directors", value = 1),
+      numericInput("writer_count", "# of Writers", value = 1),
+      textInput("star", "Star", value = ""),
+      numericInput("duration", "Duration (Mins)", value = 120),
+      numericInput("genres_count", "# of Genres", value = 1),
+      selectInput("primary_genre", "Primary Genre",
+                  choices = c("Adventure", "Comedy", "Fantasy", "Animation", "Family", 
+                              "Biography", "Drama", "History", "Action", "Sci-Fi", 
+                              "Crime", "Mystery", "Thriller", "Musical", "Romance", 
+                              "Horror", "Sport", "Documentary", "Music", "War", 
+                              "Western", "Short"), 
+                  selected = "Action"),
+      actionButton("predict_button", "Predict Revenue")
+    ),
+    mainPanel(
+      textOutput("prediction_output")
+    )
+  )
 )
 
+server <- function(input, output) {
+  predicted_revenue <- eventReactive(input$predict_button, {
+    new_data <- tibble(
+      Budget = as.numeric(input$budget),
+      Distributor = input$distributor,
+      `Earliest Release Date` = as.Date(input$release_date),
+      MPAA = input$mpaa_rating,
+      Director_Count = as.numeric(input$director_count),
+      Writer_Count = as.numeric(input$writer_count),
+      Star = input$star,
+      `Run Time (Mins)` = as.numeric(input$duration),
+      Genres_Count = as.numeric(input$genres_count),
+      Primary_Genre = input$primary_genre,
+    )
 
-# Bake the new data using the same recipe
-new_data_baked <- recipes::bake(recipe_pipeline2, new_data)
+    # Bake the new data using the updated recipe
+    new_data_baked <- recipes::bake(recipe_pipeline2, new_data)
 
-# Make predictions using the trained model
-predictions <- predict(lm_fit, new_data_baked)
+    # Make predictions using the trained model
+    predictions <- predict(lm_fit, new_data_baked)
 
-# View the predicted worldwide revenue
-predictions
+    # Return the predicted revenue as a numeric value
+    as.numeric(predictions)
+  })
 
-# Training Data
-df_train3 <- df_train2 %>% 
-  dplyr::mutate(Director_Count = str_count(Director, ",") + 1,
-                Writer_Count = str_count(Writer, ",") + 1)
+  # Display the predicted revenue as a numeric value
+  output$prediction_output <- renderText({
+    predicted_revenue()
+  })
+}
 
-recipe_pipeline3 <- recipes::recipe(Worldwide ~ Budget + 
-                                      Distributor + 
-                                      `Earliest Release Date` + 
-                                      MPAA + 
-                                      `Run Time (Mins)` + 
-                                      Director_Count +
-                                      Writer_Count,
-                                    data = df_train3) %>%
-  recipes::step_mutate(Budget_Category = cut(Budget, 
-                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
-                                     labels = c("Small", "Medium", "Large"))) %>% 
-  step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
-  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
-  recipes::prep()
-
-train_baked3 <- recipes::bake(recipe_pipeline3, df_train3)
-
-options(mc.cores = parallel::detectCores())
-model_bayes <-
-  parsnip::linear_reg(mode = "regression") %>%
-  parsnip::set_engine(
-    "stan",
-    prior_intercept = rstanarm::normal(),
-    prior = rstanarm::student_t(df = 1),
-    iter = 4000,
-    seed = 123
-  ) %>%
-  parsnip::fit(Worldwide ~ . ,  data = train_baked3)
-
-new_data_baked2 <- recipes::bake(recipe_pipeline3, new_data)
-predictions2 <- predict(model_bayes, new_data_baked2)
-
-test <- df %>% 
-  dplyr::group_by(Distributor) %>% 
-  dplyr::summarise(count = n()) %>% 
-  dplyr::arrange(desc(count))
-test
-
+# Run the Shiny app
+shinyApp(ui, server)
 ```
 
