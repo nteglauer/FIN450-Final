@@ -28,6 +28,7 @@ library(yardstick)
 library(arrow)
 library(feasts)
 library(patchwork)
+library(corrplot)
 
 ```
 
@@ -344,8 +345,7 @@ df <- temp[, -15] %>%
                 Genres = strsplit(Genres, "\r\n[[:space:]]*\\r\\n"),
                 Genres = sapply(Genres, function(x) paste(trimws(x), collapse = ", "))) %>%
                 dplyr::select(-c(`Running Time`, Hours, Minutes)) %>% 
-  
-  dplyr::filter(!grepl("Re-release", Title, ignore.case = TRUE))
+                dplyr::filter(!grepl("Re-release", Title, ignore.case = TRUE))
 
 df <- df %>%
   dplyr::mutate("Release Month" = month(`Earliest Release Date`, label = TRUE)) %>%
@@ -542,9 +542,9 @@ ts %>%
 ```
 
 ## **Film Characteristics and Insights**
-The genre of a film is a crucial aspect that defines its style, tone, and overall artistic expression. It serves as a blueprint, giving audiences a general idea of what to expect and helping filmmakers convey their vision effectively. 
+The genre of a film is a crucial aspect that defines its style, tone, and overall artistic expression. It serves as a blueprint, giving audiences a general idea of what to expect and helping filmmakers convey their vision effectively. The genre serves as a crucial component in the marketing and promotion of a film. It helps studios target specific demographics and tailor promotional campaigns to reach the intended audience.
 
-The genre serves as a crucial component in the marketing and promotion of a film. It helps studios target specific demographics and tailor promotional campaigns to reach the intended audience. A well-defined genre can attract viewers who are inclined towards a particular type of storytelling or thematic content.
+As illustrated in the chart, Sci-Fi and Adventure emerge as the most lucrative genres within the film industry. This can be primarily attributed to the presence of many blockbuster titles within these specific genres. Despite the presence of outliers, which could represent exceptional cases or singular phenomena, the overarching trend reflected in the chart suggests a consistent and widespread favoritism towards Sci-Fi and Adventure genres. This pattern implies that audiences are consistently drawn to these genres, reinforcing their status as the forefront contributors to the film industry's financial success.
 
 ```{r Genre Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -561,15 +561,6 @@ genre_plot <- genre %>%
        y = "Revenue") +
   theme(legend.position = "none")
 
-genre_summary <- genre %>%
-  group_by(Genres) %>%
-  summarise(Avg_Revenue = mean(Worldwide, na.rm = TRUE)) %>%
-  arrange(desc(Avg_Revenue)) %>% 
-  head(10) %>% 
-  kbl(caption = "Top 10 Genres by Revenue",
-      col.names = c("Genre", "Avg Revenue")) %>% 
-  kable_classic(full_width = F, html_font = "Times New Roman")
-
 genre_distribution <- genre %>% 
   dplyr::group_by(Genres) %>% 
   dplyr::summarise(Movie_Count = n()) %>% 
@@ -583,8 +574,16 @@ genre_distribution <- genre %>%
   theme(legend.position = "none")
 
 genre_plot
-genre_summary
 
+```
+
+Upon analyzing the revenue distributions across genres, a notable observation emerged: the box plots for the Fantasy and Family genres exhibited remarkable similarity. This observation prompted a deeper exploration into the correlations among various genre combinations.
+
+A noteworthy finding was the high positive correlation between the Animation and Family genres. This correlation aligns seamlessly with the prevalent trend of animated family-oriented films. Conversely, an intriguing insight surfaced when examining the negative correlation between Thriller and Comedy genres. This distinctive relationship suggests an unconventional pairing that has not been extensively explored in the cinematic landscape.
+
+This negative correlation sparks a thought-provoking notion — the potential for an innovative and revolutionary genre combination. The rarity of Thriller-Comedy hybrids in the current cinematic landscape presents an opportunity for filmmakers to experiment. This unexplored territory not only provides creative potential but also introduces the possibility of captivating a diverse audience with a novel cinematic experience.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 genre_occurrence <- genre %>% 
   count(Title, Genres) %>%
   filter(n > 0) %>%
@@ -594,6 +593,8 @@ genre_occurrence <- genre %>%
 correlation_matrix <- cor(genre_occurrence[, -c(1, 2)])
 corrplot(correlation_matrix, method = "color", addrect = 2)
 ```
+
+Movies often navigate across various genres to broaden their appeal and cater to a diverse demographic. The trend indicates that a film's performance tends to improve as it incorporates multiple genres, with the optimal balance appearing to be around six genres.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 genres_per_movie <- df %>% 
