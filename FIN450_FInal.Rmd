@@ -542,6 +542,9 @@ ts %>%
 ```
 
 ## **Film Characteristics and Insights**
+The genre of a film is a crucial aspect that defines its style, tone, and overall artistic expression. It serves as a blueprint, giving audiences a general idea of what to expect and helping filmmakers convey their vision effectively. 
+
+The genre serves as a crucial component in the marketing and promotion of a film. It helps studios target specific demographics and tailor promotional campaigns to reach the intended audience. A well-defined genre can attract viewers who are inclined towards a particular type of storytelling or thematic content.
 
 ```{r Genre Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
@@ -582,6 +585,14 @@ genre_distribution <- genre %>%
 genre_plot
 genre_summary
 
+genre_occurrence <- genre %>% 
+  count(Title, Genres) %>%
+  filter(n > 0) %>%
+  spread(Genres, n, fill = 0) %>%
+  mutate(across(everything(), as.numeric))
+
+correlation_matrix <- cor(genre_occurrence[, -c(1, 2)])
+corrplot(correlation_matrix, method = "color", addrect = 2)
 ```
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
@@ -602,7 +613,6 @@ genres_per_movie <- df %>%
 
 genres_per_movie
 ```
-
 
 ```{r Cast Analysis}
 cast <- df %>% 
@@ -836,7 +846,9 @@ new_data <- tibble::tibble(
   `Earliest Release Date` = as.Date("2017-03-17"),  # Replace with your release date
   MPAA = "R",  # Replace with your MPAA rating
   `Run Time (Mins)` = 137,  # Replace with your run time
-  Star = "Hugh Jackman"  # Replace with your star value
+  Star = "Hugh Jackman",
+  Director_Count = 1,
+  Writer_Count = 4
 )
 
 
@@ -848,6 +860,43 @@ predictions <- predict(lm_fit, new_data_baked)
 
 # View the predicted worldwide revenue
 predictions
+
+# Training Data
+df_train3 <- df_train2 %>% 
+  dplyr::mutate(Director_Count = str_count(Director, ",") + 1,
+                Writer_Count = str_count(Writer, ",") + 1)
+
+recipe_pipeline3 <- recipes::recipe(Worldwide ~ Budget + 
+                                      Distributor + 
+                                      `Earliest Release Date` + 
+                                      MPAA + 
+                                      `Run Time (Mins)` + 
+                                      Director_Count +
+                                      Writer_Count,
+                                    data = df_train3) %>%
+  recipes::step_mutate(Budget_Category = cut(Budget, 
+                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
+                                     labels = c("Small", "Medium", "Large"))) %>% 
+  step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
+  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
+  recipes::prep()
+
+train_baked3 <- recipes::bake(recipe_pipeline3, df_train3)
+
+options(mc.cores = parallel::detectCores())
+model_bayes <-
+  parsnip::linear_reg(mode = "regression") %>%
+  parsnip::set_engine(
+    "stan",
+    prior_intercept = rstanarm::normal(),
+    prior = rstanarm::student_t(df = 1),
+    iter = 4000,
+    seed = 123
+  ) %>%
+  parsnip::fit(Worldwide ~ . ,  data = train_baked3)
+
+new_data_baked2 <- recipes::bake(recipe_pipeline3, new_data)
+predictions2 <- predict(model_bayes, new_data_baked2)
 
 test <- df %>% 
   dplyr::group_by(Distributor) %>% 
