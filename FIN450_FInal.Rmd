@@ -643,7 +643,12 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
-```{r Length Analysis}
+Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
+- Short: Less than 90 Minutes
+- Medium: Less than 120 Minutes
+- Long: 120+ Minutes
+
+```{r Length Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 length <- df %>% 
   dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
   dplyr::filter(`Earliest Release Date` >= "1999-01-01") %>% 
@@ -657,22 +662,23 @@ length <- df %>%
 
 length$Length_Category <- factor(length$Length_Category, levels = c("Short", "Medium", "Long"))
 
-ggplot(length, aes(x = Length_Category, y = AvgRev)) +
-  geom_bar(stat = "summary", fun = "mean", fill = "skyblue", color = "black") +
+ggplot(length, aes(x = Length_Category, y = AvgRev, fill = Length_Category)) +
+  geom_bar(stat = "summary", fun = "mean", color = "black") +
   labs(title = "Average Revenue by Movie Length Category",
        x = "Length Category",
        y = "Average Revenue") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "none")
 
 ```
 
-##**Cast & Crew Analysis**
+## **Cast & Crew Analysis**
 The composition of the cast is a crucial factor in the success of a film, where actors have the ability to either propel or hinder its success. While the quantification of an actor's precise impact on a film's success may pose a challenge, delving into the data reveals enlightening insights.
 
 There appears to be a shift in audience preferences. The audience, while still embracing the familiarity of established actors, demonstrates a growing affinity for emerging talents. This graph also reveals the audience is now forging connections with a new cohort of actors who have become their own "regulars."
 
 When seeking the ideal star for an upcoming film, Robert Downey Jr. or Chris Pratt stands out. Both actors have established themselves as powerhouses of the new cohort of actors.
-```{r Cast Analysis}
+```{r Cast Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 cast <- df %>% 
   dplyr::select(Title, Worldwide, Cast) %>% 
   tidyr::separate_rows(Cast, sep = ", ") %>% 
