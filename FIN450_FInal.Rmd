@@ -21,7 +21,6 @@ library(openxlsx)
 library(kableExtra)
 library(broom)
 library(plotly)
-library(rstanarm)
 library(parsnip)
 library(tidymodels)
 library(rsample)
@@ -32,6 +31,7 @@ library(feasts)
 library(patchwork)
 library(corrplot)
 library(shiny)
+library(ggfortify)
 
 ```
 
@@ -348,7 +348,14 @@ df <- temp[, -15] %>%
                 Genres = strsplit(Genres, "\r\n[[:space:]]*\\r\\n"),
                 Genres = sapply(Genres, function(x) paste(trimws(x), collapse = ", "))) %>%
                 dplyr::select(-c(`Running Time`, Hours, Minutes)) %>% 
-                dplyr::filter(!grepl("Re-release", Title, ignore.case = TRUE))
+                dplyr::filter(!grepl("Re-release", Title, ignore.case = TRUE)) %>% 
+  dplyr::mutate(Distributor = dplyr::case_when(
+    grepl("DreamWorks", Distributor) ~ "DreamWorks Distribution",
+    grepl("20th Century Studios", Distributor) ~ "Twentieth Century Fox",
+    grepl("Sony Pictures Classics", Distributor) ~ "Sony Pictures Entertainment (SPE)",
+    grepl("Paramount Vantage", Distributor) ~ "Paramount Pictures",
+    TRUE ~ Distributor  # Keep the original value for other cases
+  ))
 
 df <- df %>%
   dplyr::mutate("Release Month" = month(`Earliest Release Date`, label = TRUE)) %>%
@@ -356,7 +363,6 @@ df <- df %>%
   mutate(`First Genre` = sapply(strsplit(Genres, ", "), `[`, 1)) %>%
   mutate(count_genres = str_count(Genres, ", ") + 1)
 df
-
 
 ```
 
@@ -545,6 +551,25 @@ ts %>%
 ```
 
 ## **Film Characteristics and Insights**
+
+Undoubtedly, a film's budget stands as the biggest influencer of its success, controlling most aspects of production. A substantial financial backing allows for elevated production values, sophisticated marketing strategies, and the recruitment of established talent, all crucial elements that contribute to a film's overall quality and marketability. This dynamic relationship is graphically portrayed by the slope of the regression line, emphasizing the large influence of budget and the multifaceted components shaping a film's trajectory.
+
+```{r Budget Analysis, echo=FALSE, message=FALSE, warning=FALSE}
+
+budget <- df %>% 
+  dplyr::select(Title, Worldwide, Budget) %>% 
+  stats::na.omit() %>% 
+  ggplot(aes(x = Budget,
+             y = Worldwide)) + 
+  geom_point() + 
+  stat_smooth(method = "lm", se = FALSE) +
+  labs(title = "Average Revenue by Budget",
+       x = "Length Category",
+       y = "Average Revenue")
+
+```
+
+
 The genre of a film is a crucial aspect that defines its style, tone, and overall artistic expression. It serves as a blueprint, giving audiences a general idea of what to expect and helping filmmakers convey their vision effectively. The genre serves as a crucial component in the marketing and promotion of a film. It helps studios target specific demographics and tailor promotional campaigns to reach the intended audience.
 
 As illustrated in the chart, Sci-Fi and Adventure emerge as the most lucrative genres within the film industry. This can be primarily attributed to the presence of many blockbuster titles within these specific genres. Despite the presence of outliers, which could represent exceptional cases or singular phenomena, the overarching trend reflected in the chart suggests a consistent and widespread favoritism towards Sci-Fi and Adventure genres. This pattern implies that audiences are consistently drawn to these genres, reinforcing their status as the forefront contributors to the film industry's financial success.
@@ -618,6 +643,35 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
+```{r Length Analysis}
+length <- df %>% 
+  dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
+  dplyr::filter(`Earliest Release Date` >= "1999-01-01") %>% 
+  dplyr::mutate(Length_Category = case_when(
+    `Run Time (Mins)` < 90 ~ "Short",
+    `Run Time (Mins)` < 120 ~ "Medium",
+    TRUE ~ "Long")) %>% 
+  dplyr::group_by(Length_Category) %>% 
+  dplyr::summarise(AvgRev = mean(Worldwide),
+                   Count = n())
+
+length$Length_Category <- factor(length$Length_Category, levels = c("Short", "Medium", "Long"))
+
+ggplot(length, aes(x = Length_Category, y = AvgRev)) +
+  geom_bar(stat = "summary", fun = "mean", fill = "skyblue", color = "black") +
+  labs(title = "Average Revenue by Movie Length Category",
+       x = "Length Category",
+       y = "Average Revenue") +
+  theme_minimal()
+
+```
+
+##**Cast & Crew Analysis**
+The composition of the cast is a crucial factor in the success of a film, where actors have the ability to either propel or hinder its success. While the quantification of an actor's precise impact on a film's success may pose a challenge, delving into the data reveals enlightening insights.
+
+There appears to be a shift in audience preferences. The audience, while still embracing the familiarity of established actors, demonstrates a growing affinity for emerging talents. This graph also reveals the audience is now forging connections with a new cohort of actors who have become their own "regulars."
+
+When seeking the ideal star for an upcoming film, Robert Downey Jr. or Chris Pratt stands out. Both actors have established themselves as powerhouses of the new cohort of actors.
 ```{r Cast Analysis}
 cast <- df %>% 
   dplyr::select(Title, Worldwide, Cast) %>% 
@@ -636,7 +690,7 @@ cast <- df %>%
   dplyr::summarise(AvgRev = mean(AvgRev),
                    Count = n()) %>% 
   dplyr::arrange(desc(AvgRev))
-cast
+
 # Changing preference for newer faces or different types of story telling. Still like regulars 
 range_order <- c("Less than 5", "5-10", "10-15", "15-20", "20+")
 cast$Movies_Acted <- factor(cast$Movies_Acted, levels = range_order)
@@ -648,6 +702,7 @@ ggplot(cast, aes(x = Movies_Acted, y = AvgRev, fill = factor(Count))) +
        y = "Average Revenue",
        fill = "Count") +
   theme_minimal()
+
 star <- df %>% 
   dplyr::select(Worldwide, Star) %>% 
   dplyr::group_by(Star) %>% 
@@ -655,7 +710,7 @@ star <- df %>%
                    Count = n()) %>% 
   dplyr::filter(Count >= 5) %>% 
   dplyr::arrange(desc(AvgRev))
-star
+
 star_plot <- star %>%  
   ggplot(aes(x = Count, y = AvgRev, size = Count, color = Count,
              text = paste("Star:", Star, "<br>Number of Movies:", Count, "<br>Average Revenue:", scales::dollar(AvgRev)))) +
@@ -665,39 +720,35 @@ star_plot <- star %>%
        y = "Average Revenue",
        size = "Number of Movies")
 plotly::ggplotly(star_plot, tooltip = "text")
+
 ```
 
-```{r Writer Analysis}
+```{r Crew Analysis}
 #RUN REGRESSION ANALYSIS
 
-writer <- df %>% 
-  dplyr::select(Title, Worldwide, Writer) %>% 
+budget <- df %>% 
+  dplyr::select(Title, Worldwide, Director, Writer, Budget, Cinematographer, `Production Designer`, Editor, Producer, Composer) %>% 
   stats::na.omit() %>% 
-  dplyr::mutate(Writer_Count = str_count(Writer, ",") + 1) %>%
-  dplyr::mutate(Grouped_Writer_Count = ifelse(Writer_Count >= 10, 10, Writer_Count)) %>%
-  dplyr::group_by(Grouped_Writer_Count) %>% 
-  dplyr::summarise(AvgRevenue = mean(Worldwide),
-                   Count = n())
+  dplyr::mutate(Director_Count = str_count(Director, ",") + 1,
+                Writer_Count = str_count(Writer, ",") + 1,
+                Cinematographer_Count = str_count(Cinematographer, ",") + 1,
+                Prduction_Designer_Count = str_count(`Production Designer`, ",") + 1,
+                Editor_Count = str_count(Editor, ",") + 1,
+                Producer_Count = str_count(Producer, ",") + 1,
+                Composer_Count = str_count(Composer, ",") + 1)
 
-writer
+crew_lm <- lm(Budget ~ Director_Count + Writer_Count + Cinematographer_Count + Prduction_Designer_Count + Editor_Count + Producer_Count + Composer_Count, data = budget)
 
-```
+summary(crew_lm)
 
-```{r Director Analysis}
-# FIND AND GRAPH THE TOP DIRECTORS
-# DIRECTOR GENRE GRAPH
+revenue_lm <- lm(Worldwide ~ Director_Count + Writer_Count + Cinematographer_Count + Prduction_Designer_Count + Editor_Count + Producer_Count + Composer_Count, data = budget)
 
-director <- df %>% 
-  dplyr::select(Title, Worldwide, Director) %>% 
-  dplyr::mutate(Director_Count = str_count(Director, ",") + 1) %>% 
-  dplyr::group_by(Director_Count) %>% 
-  dplyr::summarise(AvgRevenue = median(Worldwide),
-                   Count = n()) %>% 
-  dplyr::filter(Count > 2)
+summary(revenue_lm)
 
-director
+autoplot(revenue_lm, size = 0.5)
 
 ```
+
 
 MACHINE LEARNING
 
@@ -846,27 +897,41 @@ lm_fit <- parsnip::linear_reg(mode = "regression") %>%
   parsnip::set_engine("lm") %>%
   parsnip::fit(Worldwide ~ ., data = train_baked2)
 
+top_stars <- head(star$Star, 50)
+
 ui <- fluidPage(
   titlePanel("Movie Revenue Prediction"),
   sidebarLayout(
     sidebarPanel(
-      textInput("budget", "Budget", value = ""),
-      textInput("distributor", "Distributor", value = ""),
-      dateInput("release_date", "Release Date", value = ""),
-      selectInput("mpaa_rating", "MPAA Rating",
-                  choices = c("PG", "PG-13", "R"), selected = "PG-13"),
-      numericInput("director_count", "# of Directors", value = 1),
-      numericInput("writer_count", "# of Writers", value = 1),
-      textInput("star", "Star", value = ""),
-      numericInput("duration", "Duration (Mins)", value = 120),
-      numericInput("genres_count", "# of Genres", value = 1),
-      selectInput("primary_genre", "Primary Genre",
-                  choices = c("Adventure", "Comedy", "Fantasy", "Animation", "Family", 
-                              "Biography", "Drama", "History", "Action", "Sci-Fi", 
-                              "Crime", "Mystery", "Thriller", "Musical", "Romance", 
-                              "Horror", "Sport", "Documentary", "Music", "War", 
-                              "Western", "Short"), 
-                  selected = "Action"),
+      fluidRow(
+        column(width = 6,
+          textInput("budget", "Budget", value = ""),
+          selectInput("distributor", "Distributor",
+                      choices = c("Warner Bros.", "Universal Pictures", 
+                                  "Walt Disney Studios Motion Pictures", 
+                                  "Sony Pictures Entertainment (SPE)", 
+                                  "Twentieth Century Fox", "Paramount Pictures", 
+                                  "Lions Gate Films", "DreamWorks Distribution"), 
+                      selected = "Warner Bros."),
+          dateInput("release_date", "Release Date", value = ""),
+          selectInput("mpaa_rating", "MPAA Rating",
+                      choices = c("PG", "PG-13", "R"), selected = "PG-13"),
+          numericInput("director_count", "# of Directors", value = 1)
+        ),
+        column(width = 6,
+          numericInput("writer_count", "# of Writers", value = 1),
+          selectInput("star", "Star", choices = top_stars, selected = top_stars[1]),
+          numericInput("duration", "Duration (Mins)", value = 120),
+          numericInput("genres_count", "# of Genres", value = 1),
+          selectInput("primary_genre", "Primary Genre",
+                      choices = c("Adventure", "Comedy", "Fantasy", "Animation", "Family", 
+                                  "Biography", "Drama", "History", "Action", "Sci-Fi", 
+                                  "Crime", "Mystery", "Thriller", "Musical", "Romance", 
+                                  "Horror", "Sport", "Documentary", "Music", "War", 
+                                  "Western", "Short"), 
+                      selected = "Action")
+        )
+      ),
       actionButton("predict_button", "Predict Revenue")
     ),
     mainPanel(
