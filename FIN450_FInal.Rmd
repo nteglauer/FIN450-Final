@@ -729,7 +729,16 @@ plotly::ggplotly(star_plot, tooltip = "text")
 
 ```
 
-```{r Crew Analysis}
+The crew is the backbone of the production process for a film. There exists a prevailing assumption that a larger crew equates to a more successful production—a notion that holds true for certain professions but conversely defies expectations for others. All else being equal:
+
+1. More writers = More revenue: Films with a higher number of writers may benefit from diverse perspectives, creative inputs, and a richer storyline. A well-crafted script, shaped by multiple creative minds, could appeal to a broader audience, leading to increased viewership and higher revenue.
+2. More Editors = More Revenue: An increased number of editors could contribute to a higher quality and more polished final product. A well-edited film is likely to receive positive reviews, generate buzz, and attract a larger audience. A higher viewer satisfaction, resulting from effective editing, may contribute to positive word-of-mouth promotion, further boosting global revenue.
+3. More Producers = Less Revenue: Too many producers could lead to challenges in decision-making, creative conflicts, and inefficient resource allocation. This could result in a film that lacks a cohesive vision, impacting its commercial success negatively.
+4. More Composers = Less Revenue: A well-coordinated musical composition is crucial for the emotional impact of a film. Too many composers might lead to conflicting styles, potentially undermining the cohesiveness of the soundtrack and, consequently, the overall viewer experience.
+
+Note that heteroscedasticity exists in our data set which raises concerns about the reliability of certain statistical inferences.
+
+```{r Crew Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 #RUN REGRESSION ANALYSIS
 
 budget <- df %>% 
@@ -743,18 +752,17 @@ budget <- df %>%
                 Producer_Count = str_count(Producer, ",") + 1,
                 Composer_Count = str_count(Composer, ",") + 1)
 
-crew_lm <- lm(Budget ~ Director_Count + Writer_Count + Cinematographer_Count + Prduction_Designer_Count + Editor_Count + Producer_Count + Composer_Count, data = budget)
-
-summary(crew_lm)
-
 revenue_lm <- lm(Worldwide ~ Director_Count + Writer_Count + Cinematographer_Count + Prduction_Designer_Count + Editor_Count + Producer_Count + Composer_Count, data = budget)
 
-summary(revenue_lm)
+summary_revenue_lm <- summary(revenue_lm)
+
+revenue_table <- kable(tidy(summary_revenue_lm)) %>% 
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+revenue_table
 
 autoplot(revenue_lm, size = 0.5)
-
 ```
-
 
 MACHINE LEARNING
 
@@ -870,7 +878,7 @@ print(prediction)
 
 ```
 
-```{r shiny-app, message=FALSE, warning=FALSE}
+```{r shiny-app, echo=FALSE, message=FALSE, warning=FALSE}
 # Sampling
 df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
 df_train2 <- rsample::training(df_split2)
