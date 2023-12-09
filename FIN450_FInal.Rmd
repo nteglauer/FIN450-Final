@@ -643,7 +643,8 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
-Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
+Over time, the run time of films has slowly risen. Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
+
 - Short: Less than 90 Minutes
 - Medium: Less than 120 Minutes
 - Long: 120+ Minutes
@@ -662,15 +663,49 @@ length <- df %>%
 
 length$Length_Category <- factor(length$Length_Category, levels = c("Short", "Medium", "Long"))
 
-ggplot(length, aes(x = Length_Category, y = AvgRev, fill = Length_Category)) +
+length_category_plot <- ggplot(length, aes(x = Length_Category, y = AvgRev, fill = Length_Category)) +
   geom_bar(stat = "summary", fun = "mean", color = "black") +
-  labs(title = "Average Revenue by Movie Length Category",
+  labs(title = "Average Revenue by Length Category",
        x = "Length Category",
        y = "Average Revenue") +
   theme_minimal() +
   theme(legend.position = "none")
 
+
+length_plot <- df %>% 
+  dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
+  dplyr::filter(`Earliest Release Date` >= "1999-01-01" & `Run Time (Mins)` > 60) %>% 
+  stats::na.omit() %>% 
+  ggplot(aes(x = `Earliest Release Date`,
+             y = `Run Time (Mins)`)) +
+  geom_point() +
+  labs(title = "Duration Over Time",
+       x = "Date",
+       y = "Run Time (Mins)") +
+  stat_smooth(method = lm, se = FALSE)
+
+length_plot | length_category_plot
+
 ```
+
+```{r Rating Analysis, echo=FALSE, message=FALSE, warning=FALSE}
+
+rating <- df %>% 
+  dplyr::select(Worldwide, Title, MPAA) %>% 
+  stats::na.omit() %>% 
+  dplyr::filter(MPAA != "Not Rated") 
+  
+ggplot(rating, aes(x = MPAA, y = Worldwide, fill = MPAA)) +
+  geom_boxplot() +
+  geom_point(data = subset(rating, MPAA == "R"), aes(x = MPAA, y = Worldwide), color = "red", size = 3) +
+  labs(title = "Comparison of Average Revenue by MPAA Rating",
+       x = "MPAA Rating",
+       y = "Average Revenue") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
 
 ## **Cast & Crew Analysis**
 The composition of the cast is a crucial factor in the success of a film, where actors have the ability to either propel or hinder its success. While the quantification of an actor's precise impact on a film's success may pose a challenge, delving into the data reveals enlightening insights.
@@ -766,7 +801,7 @@ autoplot(revenue_lm, size = 0.5)
 
 MACHINE LEARNING
 
-```{r regression tree analysis}
+```{r regression tree analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 library(dplyr)
 library(parsnip)
@@ -914,7 +949,7 @@ lm_fit <- parsnip::linear_reg(mode = "regression") %>%
 top_stars <- head(star$Star, 50)
 
 ui <- fluidPage(
-  titlePanel("Movie Revenue Prediction"),
+  titlePanel("Predict Your Own Movie's Revenue!"),
   sidebarLayout(
     sidebarPanel(
       fluidRow(
