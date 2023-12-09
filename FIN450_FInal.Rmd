@@ -567,6 +567,7 @@ budget <- df %>%
        x = "Length Category",
        y = "Average Revenue")
 
+budget
 ```
 
 
@@ -643,7 +644,7 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
-Over time, the run time of films has slowly risen. Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
+Over the course of cinematic history, there has been a gradual and discernible increase in the average run time of films. Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
 
 - Short: Less than 90 Minutes
 - Medium: Less than 120 Minutes
@@ -665,7 +666,7 @@ length$Length_Category <- factor(length$Length_Category, levels = c("Short", "Me
 
 length_category_plot <- ggplot(length, aes(x = Length_Category, y = AvgRev, fill = Length_Category)) +
   geom_bar(stat = "summary", fun = "mean", color = "black") +
-  labs(title = "Average Revenue by Length Category",
+  labs(title = "Avg Revenue by Length Category",
        x = "Length Category",
        y = "Average Revenue") +
   theme_minimal() +
@@ -688,6 +689,8 @@ length_plot | length_category_plot
 
 ```
 
+The rating of a film is important as it dictates the specific demographics to which the film is likely to appeal. While the rating, in general, might not wield a substantial influence on the overall revenue of a film, a notable exception is observed with the "R" rating. Films carrying an "R" rating exhibit a significant decrease in average revenue, aligning with the overarching understanding that "R" rated movies cater to a comparatively smaller demographic, thus potentially limiting their market reach. This distinctive trend highlights the impact of content restrictions on audience accessibility and the subsequent financial performance of a film.
+
 ```{r Rating Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 rating <- df %>% 
@@ -705,7 +708,6 @@ ggplot(rating, aes(x = MPAA, y = Worldwide, fill = MPAA)) +
   theme(legend.position = "none")
 
 ```
-
 
 ## **Cast & Crew Analysis**
 The composition of the cast is a crucial factor in the success of a film, where actors have the ability to either propel or hinder its success. While the quantification of an actor's precise impact on a film's success may pose a challenge, delving into the data reveals enlightening insights.
