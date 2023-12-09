@@ -410,17 +410,14 @@ theatre_stocks #includes returns daily for IMAX and Cineplex stocks
 
 ```
 
-REPORT LAYOUT:
-- Introduction
-- General Analysis and insights (try to find unique insights)
-- Analysis of factors affecting revenue 
-- ML and prediction of select movies
-
 # **Executive Summary**
-1. 
-2.
-3.
-4.
+
+1. Films released in May and June perform better than any other month. There is also yearly seasonality in revenue.
+2. Budget is the largest influence in Revenue, dictating many aspects of the film. 
+3. Films have gotten slightly longer over time, and films that are over 120 Minutes perform exceptionally better than shorter films.
+4. Differences in revenue by MPAA rating are small, except for the "R" rating which performs significantly worse than other ratings.
+5. Sci-Fi and Adventure emerge as the most successful genres. Family and Animation has the strongest positive correlation in terms of genre pairings, while Thriller and Comedy has the strongest negative correlation providing a potential unexplored territory of genre pairings. Films also tend to do better the more genres it covers with 6 being the optimal amount.
+6. 
 
 ## **Project Framework: Definition and Methodology**
 In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced analysis of important factors such as the expertise of the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
@@ -563,13 +560,77 @@ budget <- df %>%
              y = Worldwide)) + 
   geom_point() + 
   stat_smooth(method = "lm", se = FALSE) +
-  labs(title = "Average Revenue by Budget",
-       x = "Length Category",
-       y = "Average Revenue")
+  labs(title = "Revenue by Budget",
+       x = "Budget",
+       y = "Revenue")
 
 budget
 ```
 
+Over the course of cinematic history, there has been a gradual and discernible increase in the average run time of films. Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
+
+- Short: Less than 90 Minutes
+- Medium: Less than 120 Minutes
+- Long: 120+ Minutes
+
+```{r Length Analysis, echo=FALSE, message=FALSE, warning=FALSE}
+length <- df %>% 
+  dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
+  dplyr::filter(`Earliest Release Date` >= "1999-01-01") %>% 
+  dplyr::mutate(Length_Category = case_when(
+    `Run Time (Mins)` < 90 ~ "Short",
+    `Run Time (Mins)` < 120 ~ "Medium",
+    TRUE ~ "Long")) %>% 
+  dplyr::group_by(Length_Category) %>% 
+  dplyr::summarise(AvgRev = mean(Worldwide),
+                   Count = n())
+
+length$Length_Category <- factor(length$Length_Category, levels = c("Short", "Medium", "Long"))
+
+length_category_plot <- ggplot(length, aes(x = Length_Category, y = AvgRev, fill = Length_Category)) +
+  geom_bar(stat = "summary", fun = "mean", color = "black") +
+  labs(title = "Avg Revenue by Length Category",
+       x = "Length Category",
+       y = "Average Revenue") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+length_plot <- df %>% 
+  dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
+  dplyr::filter(`Earliest Release Date` >= "1999-01-01" & `Run Time (Mins)` > 60) %>% 
+  stats::na.omit() %>% 
+  ggplot(aes(x = `Earliest Release Date`,
+             y = `Run Time (Mins)`)) +
+  geom_point() +
+  labs(title = "Duration Over Time",
+       x = "Date",
+       y = "Run Time (Mins)") +
+  stat_smooth(method = lm, se = FALSE)
+
+length_plot | length_category_plot
+
+```
+
+The rating of a film is important as it dictates the specific demographics to which the film is likely to appeal. While the rating, in general, might not wield a substantial influence on the overall revenue of a film, a notable exception is observed with the "R" rating. Films carrying an "R" rating exhibit a significant decrease in average revenue, aligning with the overarching understanding that "R" rated movies cater to a comparatively smaller demographic, thus potentially limiting their market reach. This distinctive trend highlights the impact of content restrictions on audience accessibility and the subsequent financial performance of a film.
+
+```{r Rating Analysis, echo=FALSE, message=FALSE, warning=FALSE}
+
+rating <- df %>% 
+  dplyr::select(Worldwide, Title, MPAA) %>% 
+  stats::na.omit() %>% 
+  dplyr::filter(MPAA != "Not Rated") 
+  
+ggplot(rating, aes(x = MPAA, y = Worldwide, fill = MPAA)) +
+  geom_boxplot() +
+  geom_point(data = subset(rating, MPAA == "R"), aes(x = MPAA, y = Worldwide), color = "red", size = 3) +
+  labs(title = "Comparison of Average Revenue by MPAA Rating",
+       x = "MPAA Rating",
+       y = "Average Revenue") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
 
 The genre of a film is a crucial aspect that defines its style, tone, and overall artistic expression. It serves as a blueprint, giving audiences a general idea of what to expect and helping filmmakers convey their vision effectively. The genre serves as a crucial component in the marketing and promotion of a film. It helps studios target specific demographics and tailor promotional campaigns to reach the intended audience.
 
@@ -642,71 +703,6 @@ genres_per_movie <- df %>%
   theme(legend.position = "none")
 
 genres_per_movie
-```
-
-Over the course of cinematic history, there has been a gradual and discernible increase in the average run time of films. Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
-
-- Short: Less than 90 Minutes
-- Medium: Less than 120 Minutes
-- Long: 120+ Minutes
-
-```{r Length Analysis, echo=FALSE, message=FALSE, warning=FALSE}
-length <- df %>% 
-  dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
-  dplyr::filter(`Earliest Release Date` >= "1999-01-01") %>% 
-  dplyr::mutate(Length_Category = case_when(
-    `Run Time (Mins)` < 90 ~ "Short",
-    `Run Time (Mins)` < 120 ~ "Medium",
-    TRUE ~ "Long")) %>% 
-  dplyr::group_by(Length_Category) %>% 
-  dplyr::summarise(AvgRev = mean(Worldwide),
-                   Count = n())
-
-length$Length_Category <- factor(length$Length_Category, levels = c("Short", "Medium", "Long"))
-
-length_category_plot <- ggplot(length, aes(x = Length_Category, y = AvgRev, fill = Length_Category)) +
-  geom_bar(stat = "summary", fun = "mean", color = "black") +
-  labs(title = "Avg Revenue by Length Category",
-       x = "Length Category",
-       y = "Average Revenue") +
-  theme_minimal() +
-  theme(legend.position = "none")
-
-
-length_plot <- df %>% 
-  dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
-  dplyr::filter(`Earliest Release Date` >= "1999-01-01" & `Run Time (Mins)` > 60) %>% 
-  stats::na.omit() %>% 
-  ggplot(aes(x = `Earliest Release Date`,
-             y = `Run Time (Mins)`)) +
-  geom_point() +
-  labs(title = "Duration Over Time",
-       x = "Date",
-       y = "Run Time (Mins)") +
-  stat_smooth(method = lm, se = FALSE)
-
-length_plot | length_category_plot
-
-```
-
-The rating of a film is important as it dictates the specific demographics to which the film is likely to appeal. While the rating, in general, might not wield a substantial influence on the overall revenue of a film, a notable exception is observed with the "R" rating. Films carrying an "R" rating exhibit a significant decrease in average revenue, aligning with the overarching understanding that "R" rated movies cater to a comparatively smaller demographic, thus potentially limiting their market reach. This distinctive trend highlights the impact of content restrictions on audience accessibility and the subsequent financial performance of a film.
-
-```{r Rating Analysis, echo=FALSE, message=FALSE, warning=FALSE}
-
-rating <- df %>% 
-  dplyr::select(Worldwide, Title, MPAA) %>% 
-  stats::na.omit() %>% 
-  dplyr::filter(MPAA != "Not Rated") 
-  
-ggplot(rating, aes(x = MPAA, y = Worldwide, fill = MPAA)) +
-  geom_boxplot() +
-  geom_point(data = subset(rating, MPAA == "R"), aes(x = MPAA, y = Worldwide), color = "red", size = 3) +
-  labs(title = "Comparison of Average Revenue by MPAA Rating",
-       x = "MPAA Rating",
-       y = "Average Revenue") +
-  theme_minimal() +
-  theme(legend.position = "none")
-
 ```
 
 ## **Cast & Crew Analysis**
@@ -826,7 +822,7 @@ recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release M
   # step_rm(date) %>%
   recipes::prep()
 
-test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
+test_baked <- recipes::bake(recipe_pipeline, df_test) 
 
 
 common_levels_distributor <- intersect(levels(train_baked$Distributor), levels(test_baked$Distributor))
@@ -865,7 +861,6 @@ res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
   labs(title = "Prediction vs Actual",
        subtitle = "Decision Tree - Regression")
 
-# Assuming 'model' is your decision tree model and 'df_test' is your testing data
 library(parsnip)
 library(yardstick)
 library(vip)
@@ -881,7 +876,6 @@ plot(importance)
 
 ```{r eval=FALSE, include=FALSE}
 
-# Example: Create a data frame for prediction
 unreleased_movie_data <- data.frame(
   Budget = 160000000,  # Replace with the actual budget value
   Distributor = "Lions Gate Films",  # Replace with the actual distributor value
@@ -894,7 +888,6 @@ unreleased_movie_data <- data.frame(
 
 library(dplyr)
 
-# Example: Rename columns in the tibble
 unreleased_movie_data <- unreleased_movie_data %>%
   dplyr::rename(
     Budget = Budget,
