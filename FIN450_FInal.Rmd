@@ -875,7 +875,6 @@ model <- parsnip::decision_tree(mode = "regression") %>%
 
 # Predictions on the test set
 test_predictions <- predict(model, new_data = test_baked)
-
 ```
 
 
@@ -969,9 +968,11 @@ The chart suggests outliers in predictions, particularly in high-revenue areas.
 Now, let's analyze residuals, focusing on budget—the most influential factor. We'll set "close" and "bad" thresholds for estimates, emphasizing inclusivity. Using budget, a key predictor, a boxplot highlights where our estimates succeed (budget ~ $50 million) and where they struggle (budget > $150 million), possibly due to the complexity of higher-budget films with additional influencing factors.
 
 ```{r Error Analysis 2, echo=FALSE}
+
 # Print or view the table of movies with the worst predictions
-#print(worst_predictions)
-#print(best_predictions)
+print(worst_predictions)
+print(best_predictions)
+print(residuals_df)
 
 close_threshold = 1e7  # 10 million
 bad_threshold = 5e8   # 500 million
@@ -1005,6 +1006,43 @@ ggplot(merged_df, aes(x = EstimateCategory, y = Budget)) +
 
 merged_df <- merged_df[complete.cases(merged_df), ]
 
+
+```
+
+
+
+```{r Re-Run Prediction}
+
+library(dplyr)
+library(parsnip)
+library(ggplot2)
+# Split data
+
+df_test_new <- df_test %>%
+  dplyr::filter(Budget < 125000000)
+
+test_baked <- recipes::bake(recipe_pipeline, df_test_new)  # Corrected to use test_baked
+
+# Modeling
+model <- parsnip::decision_tree(mode = "regression") %>%
+  parsnip::set_engine("rpart") %>%
+  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
+
+# Predictions on the test set
+test_predictions <- predict(model, new_data = test_baked)
+
+# Obtain and showcase the model's predictions and actual values
+res <- model %>% predict(new_data = test_baked) %>%
+  bind_cols(test_baked %>% dplyr::select(Worldwide))
+
+
+# Highlight key metrics for a comprehensive view
+metrics_table_2 <- res %>% 
+  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
+  knitr::kable(align = "c", caption = "Model Performance Metrics")
+
+metrics_table
+
 ```
 
 ```{r SHIT, echo=FALSE}
@@ -1026,43 +1064,6 @@ perform_t_test <- function(x) {
 test_results <- merged_df %>%
   summarise(across(where(is.numeric), perform_t_test))
 test_results
-```
-
-```{r eval=FALSE, include=FALSE}
-
-# Example: Create a data frame for prediction
-unreleased_movie_data <- data.frame(
-  Budget = 160000000,  # Replace with the actual budget value
-  Distributor = "Lions Gate Films",  # Replace with the actual distributor value
-  `Release Month` = "Nov",  # Replace with the actual release month value
-  MPAA = "PG-13",  # Replace with the actual MPAA rating value
-  `Run Time (Mins)` = 137,
-  `First Genre` = "Action",
-  `count_genres` = 4,
-)
-
-library(dplyr)
-
-# Example: Rename columns in the tibble
-unreleased_movie_data <- unreleased_movie_data %>%
-  dplyr::rename(
-    Budget = Budget,
-    Distributor = Distributor,
-    `Release Month` = `Release.Month`,
-    MPAA = MPAA,
-    `Run Time (Mins)` = `Run.Time..Mins.`,
-    `First Genre` = `First.Genre`
-  )
-
-
-unreleased_movie_data
-
-unreleased_movie_baked <- recipes::bake(recipe_pipeline, unreleased_movie_data)
-prediction <- predict(model, unreleased_movie_baked)
-
-print(prediction)
-
-
 ```
 
 ```{r eval=FALSE, include=FALSE}
