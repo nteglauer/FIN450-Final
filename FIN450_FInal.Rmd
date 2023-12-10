@@ -1,11 +1,16 @@
 ---
-title: "FIN450 Final Assignment"
-output: html_document
-date: "2023-11-24"
+title: "Exploring The World of Cinema"
+date: "09/12/2023"
+output: 
+  html_document:
+    runtime: shiny
+author:
+  - "Jamie Kim"
+  - "Noah Eglauer"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r Libraries, message=FALSE, warning=FALSE, include=FALSE}
@@ -19,7 +24,6 @@ library(openxlsx)
 library(kableExtra)
 library(broom)
 library(plotly)
-#library(rstanarm)
 library(parsnip)
 library(tidymodels)
 library(rsample)
@@ -28,6 +32,9 @@ library(yardstick)
 library(arrow)
 library(feasts)
 library(patchwork)
+library(corrplot)
+library(shiny)
+library(ggfortify)
 
 ```
 
@@ -305,7 +312,7 @@ combined_df <- cbind(rev_df, movie_df)
 combined_df
 
 # Change File Location to save data
-arrow::write_feather(combined_df, 'FIN450_Final.feather')
+arrow::write_feather(combined_df, 'JamieKimNoahEglauer.feather')
 ```
 
 ```{r Data Wrangling and Parsing, include=FALSE}
@@ -315,7 +322,7 @@ library(readxl)
 library(dplyr)
 library(tidyr)
 
-combined_all <- arrow::read_feather('FIN450_Final.feather')
+combined_all <- arrow::read_feather('JamieKimNoahEglauer.feather')
 
 
 temp <- combined_all %>% 
@@ -360,7 +367,6 @@ df <- df %>%
   mutate(`First Genre` = sapply(strsplit(Genres, ", "), `[`, 1)) %>%
   mutate(count_genres = str_count(Genres, ", ") + 1)
 df
-
 
 ```
 
@@ -408,24 +414,29 @@ theatre_stocks #includes returns daily for IMAX and Cineplex stocks
 
 ```
 
-REPORT LAYOUT:
-- Introduction
-- General Analysis and insights (try to find unique insights)
-- Analysis of factors affecting revenue 
-- ML and prediction of select movies
-
 # **Executive Summary**
-1. 
-2.
-3.
-4.
+
+1. Films released in May and June perform better than any other month. There is also yearly seasonality in revenue.
+2. Budget is the largest influence in Revenue, dictating many aspects of the film. 
+3. Films have gotten slightly longer over time, and films that are over 120 Minutes perform exceptionally better than shorter films.
+4. Differences in revenue by MPAA rating are small, except for the "R" rating which performs significantly worse than other ratings.
+5. Walt Disney Studios performs better than other distributors and has shown increasing revenue over time.
+6. Sci-Fi and Adventure emerge as the most successful genres. Thriller and Comedy has the strongest negative correlation providing a potential unexplored territory of genre pairing. Films also tend to do better the more genres it covers with 6 being the optimal amount.
+7. The audience demonstrates a growing affinity for emerging talents with Robert Downey Jr. and Christ Pratt being the powerhouses of the new cohort of actors.
+8. Films do better with more writers and editors, and less producers and composers.
+9. 
 
 ## **Project Framework: Definition and Methodology**
-In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced analysis of important factors such as the expertise of the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office.
+In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced analysis of important factors such as  the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office and ultimately provide a framework for users to increase earning potential for their films.
 
 The data was obtained through the use of our own web scraping algorithm and covers the top 75 grossing movies over the past 25 years.
- 
- 
+
+## **Limitations**
+- Our data only covers relatively successful films. As a result, our analysis is only relevant for larger film productions.
+- Our data set is relatively small and the model could be improved with more data. 
+- Outliers are present because of blockbuster films which may skew the analysis.
+- Some data is incomplete/missing observations.
+
 ## **Temporal Analysis**
 Over time, the average revenue demonstrates a distinct upward trend, with a notable observation regarding the rate of growth in Foreign revenue compared to Domestic revenue. The surge in global revenue is primarily driven by the rapid expansion of foreign revenue, highlighting the escalating growth and acceptance of Western films in international markets.
 
@@ -695,15 +706,6 @@ genre_plot <- genre %>%
        y = "Revenue") +
   theme(legend.position = "none")
 
-genre_summary <- genre %>%
-  group_by(Genres) %>%
-  summarise(Avg_Revenue = mean(Worldwide, na.rm = TRUE)) %>%
-  arrange(desc(Avg_Revenue)) %>% 
-  head(10) %>% 
-  kbl(caption = "Top 10 Genres by Revenue",
-      col.names = c("Genre", "Avg Revenue")) %>% 
-  kable_classic(full_width = F, html_font = "Times New Roman")
-
 genre_distribution <- genre %>% 
   dplyr::group_by(Genres) %>% 
   dplyr::summarise(Movie_Count = n()) %>% 
@@ -717,9 +719,27 @@ genre_distribution <- genre %>%
   theme(legend.position = "none")
 
 genre_plot
-genre_summary
 
 ```
+
+Upon analyzing the revenue distributions across genres, a notable observation emerged: the box plots for the Fantasy and Family genres exhibited remarkable similarity. This observation prompted a deeper exploration into the correlations among various genre combinations.
+
+A noteworthy finding was the high positive correlation between the Animation and Family genres. This correlation aligns seamlessly with the prevalent trend of animated family-oriented films. Conversely, an intriguing insight surfaced when examining the negative correlation between Thriller and Comedy genres. This distinctive relationship suggests an unconventional pairing that has not been extensively explored in the cinematic landscape.
+
+This negative correlation sparks a thought-provoking notion — the potential for an innovative and revolutionary genre combination. The rarity of Thriller-Comedy hybrids in the current cinematic landscape presents an opportunity for filmmakers to experiment. This unexplored territory not only provides creative potential but also introduces the possibility of captivating a diverse audience with a novel cinematic experience.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+genre_occurrence <- genre %>% 
+  count(Title, Genres) %>%
+  filter(n > 0) %>%
+  spread(Genres, n, fill = 0) %>%
+  mutate(across(everything(), as.numeric))
+
+correlation_matrix <- cor(genre_occurrence[, -c(1, 2)])
+corrplot(correlation_matrix, method = "color", addrect = 2)
+```
+
+Movies often navigate across various genres to broaden their appeal and cater to a diverse demographic. The trend indicates that a film's performance tends to improve as it incorporates multiple genres, with the optimal balance appearing to be around six genres.
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 genres_per_movie <- df %>% 
@@ -740,8 +760,13 @@ genres_per_movie <- df %>%
 genres_per_movie
 ```
 
+## **Cast & Crew Analysis**
+The composition of the cast is a crucial factor in the success of a film, where actors have the ability to either propel or hinder its success. While the quantification of an actor's precise impact on a film's success may pose a challenge, delving into the data reveals enlightening insights.
 
-```{r Cast Analysis}
+There appears to be a shift in audience preferences. The audience, while still embracing the familiarity of established actors, demonstrates a growing affinity for emerging talents. This graph also reveals the audience is now forging connections with a new cohort of actors who have become their own "regulars."
+
+When seeking the ideal star for an upcoming film, Robert Downey Jr. or Chris Pratt stands out. Both actors have established themselves as powerhouses of the new cohort of actors.
+```{r Cast Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 cast <- df %>% 
   dplyr::select(Title, Worldwide, Cast) %>% 
   tidyr::separate_rows(Cast, sep = ", ") %>% 
@@ -759,7 +784,7 @@ cast <- df %>%
   dplyr::summarise(AvgRev = mean(AvgRev),
                    Count = n()) %>% 
   dplyr::arrange(desc(AvgRev))
-cast
+
 # Changing preference for newer faces or different types of story telling. Still like regulars 
 range_order <- c("Less than 5", "5-10", "10-15", "15-20", "20+")
 cast$Movies_Acted <- factor(cast$Movies_Acted, levels = range_order)
@@ -771,6 +796,7 @@ ggplot(cast, aes(x = Movies_Acted, y = AvgRev, fill = factor(Count))) +
        y = "Average Revenue",
        fill = "Count") +
   theme_minimal()
+
 star <- df %>% 
   dplyr::select(Worldwide, Star) %>% 
   dplyr::group_by(Star) %>% 
@@ -778,7 +804,7 @@ star <- df %>%
                    Count = n()) %>% 
   dplyr::filter(Count >= 5) %>% 
   dplyr::arrange(desc(AvgRev))
-star
+
 star_plot <- star %>%  
   ggplot(aes(x = Count, y = AvgRev, size = Count, color = Count,
              text = paste("Star:", Star, "<br>Number of Movies:", Count, "<br>Average Revenue:", scales::dollar(AvgRev)))) +
@@ -788,64 +814,54 @@ star_plot <- star %>%
        y = "Average Revenue",
        size = "Number of Movies")
 plotly::ggplotly(star_plot, tooltip = "text")
+
 ```
 
-```{r Writer Analysis}
+The crew is the backbone of the production process for a film. There exists a prevailing assumption that a larger crew equates to a more successful production—a notion that holds true for certain professions but conversely defies expectations for others. All else being equal:
+
+1. More writers = More revenue: Films with a higher number of writers may benefit from diverse perspectives, creative inputs, and a richer storyline. A well-crafted script, shaped by multiple creative minds, could appeal to a broader audience, leading to increased viewership and higher revenue.
+2. More Editors = More Revenue: An increased number of editors could contribute to a higher quality and more polished final product. A well-edited film is likely to receive positive reviews, generate buzz, and attract a larger audience. A higher viewer satisfaction, resulting from effective editing, may contribute to positive word-of-mouth promotion, further boosting global revenue.
+3. More Producers = Less Revenue: Too many producers could lead to challenges in decision-making, creative conflicts, and inefficient resource allocation. This could result in a film that lacks a cohesive vision, impacting its commercial success negatively.
+4. More Composers = Less Revenue: A well-coordinated musical composition is crucial for the emotional impact of a film. Too many composers might lead to conflicting styles, potentially undermining the cohesiveness of the soundtrack and, consequently, the overall viewer experience.
+
+Note that heteroscedasticity exists in our data set which raises concerns about the reliability of certain statistical inferences.
+
+```{r Crew Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 #RUN REGRESSION ANALYSIS
 
-writer <- df %>% 
-  dplyr::select(Title, Worldwide, Writer) %>% 
+budget <- df %>% 
+  dplyr::select(Title, Worldwide, Director, Writer, Budget, Cinematographer, `Production Designer`, Editor, Producer, Composer) %>% 
   stats::na.omit() %>% 
-  dplyr::mutate(Writer_Count = str_count(Writer, ",") + 1) %>%
-  dplyr::mutate(Grouped_Writer_Count = ifelse(Writer_Count >= 10, 10, Writer_Count)) %>%
-  dplyr::group_by(Grouped_Writer_Count) %>% 
-  dplyr::summarise(AvgRevenue = mean(Worldwide),
-                   Count = n())
+  dplyr::mutate(Director_Count = str_count(Director, ",") + 1,
+                Writer_Count = str_count(Writer, ",") + 1,
+                Cinematographer_Count = str_count(Cinematographer, ",") + 1,
+                Prduction_Designer_Count = str_count(`Production Designer`, ",") + 1,
+                Editor_Count = str_count(Editor, ",") + 1,
+                Producer_Count = str_count(Producer, ",") + 1,
+                Composer_Count = str_count(Composer, ",") + 1)
 
-writer
+revenue_lm <- lm(Worldwide ~ Director_Count + Writer_Count + Cinematographer_Count + Prduction_Designer_Count + Editor_Count + Producer_Count + Composer_Count, data = budget)
 
+summary_revenue_lm <- summary(revenue_lm)
+
+revenue_table <- kable(tidy(summary_revenue_lm)) %>% 
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+
+revenue_table
+
+autoplot(revenue_lm, size = 0.5)
 ```
 
+MACHINE LEARNING
 
-```{r Director Analysis}
-# FIND AND GRAPH THE TOP DIRECTORS
-# DIRECTOR GENRE GRAPH
-
-director <- df %>% 
-  dplyr::select(Title, Worldwide, Director) %>% 
-  dplyr::mutate(Director_Count = str_count(Director, ",") + 1) %>% 
-  dplyr::group_by(Director_Count) %>% 
-  dplyr::summarise(AvgRevenue = median(Worldwide),
-                   Count = n()) %>% 
-  dplyr::filter(Count > 2)
-
-director
-
-```
-
-## **Predictive Analysis**
-
-Building upon the insights gained from our prior information and analysis, we will employ diverse workflow models for predictive analytics. The objective is to ascertain the global box office revenue projections for upcoming, yet-to-be-released movies.
-
-## Regression Tree Analysis
-
-Here, our aim is to train a model for utilizing a regression tree to forecast the global revenue of an upcoming release. In our preceding analysis, we established some influencing factors which we will incorporate to help the model perform.
-
-In the subsequent analysis, we made a deliberate effort to incorporate these noteworthy elements, encompassing budget, distributor, release month, MPAA rating, runtime in minutes, the primary genre, and the count of genres.
-
-
-```{r Regression Tree Analysis, echo=FALSE, warning=FALSE, include=FALSE}
+```{r regression tree analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 library(dplyr)
 library(parsnip)
 library(ggplot2)
 # Split data
 set.seed(123)  # Set a seed for reproducibility
-
-df <- df %>%
-  dplyr::mutate(	
-Distributor = substr(Distributor, 1, 5), `First Genre` = substr(`First Genre`,1,5))
-
+#df_shuffled <- df[sample(nrow(df)), ] # Shuffle data to elimate some bias hopefully/
 df_split <- df %>% rsample::initial_split(prop = 0.80)
 df_train <- rsample::training(df_split)
 df_test  <- rsample::testing(df_split)
@@ -861,26 +877,45 @@ recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release M
   # step_rm(date) %>%
   recipes::prep()
 
-test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
+test_baked <- recipes::bake(recipe_pipeline, df_test) 
 
 
 common_levels_distributor <- intersect(levels(train_baked$Distributor), levels(test_baked$Distributor))
 train_baked$Distributor <- factor(train_baked$Distributor, levels = common_levels_distributor)
 test_baked$Distributor <- factor(test_baked$Distributor, levels = common_levels_distributor)
 
+
+
 # Modeling
 model <- parsnip::decision_tree(mode = "regression") %>%
   parsnip::set_engine("rpart") %>%
-  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
+  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = train_baked)
+model
 
-# Predictions on the test set
 test_predictions <- predict(model, new_data = test_baked)
-```
+test_predictions
 
 
-```{r Regression Tree Plots Importance, echo=FALSE}
+# Plot tree
+library(rpart.plot)
+rpart.plot(
+  model$fit,
+  roundint = F,
+  cex = 1,
+  fallen.leaves = F,
+  extra = "auto",
+  main = "Regression Tree"
+)
 
-# Assuming 'model' is your decision tree model and 'df_test' is your testing data
+# Results
+res <- model %>% predict(new_data = test_baked) %>%
+  bind_cols(test_baked %>% dplyr::select(Worldwide))
+res %>% yardstick::metrics(truth = Worldwide, estimate = .pred)
+
+res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
+  labs(title = "Prediction vs Actual",
+       subtitle = "Decision Tree - Regression")
+
 library(parsnip)
 library(yardstick)
 library(vip)
@@ -891,199 +926,66 @@ importance <- model %>% vip()
 # Assess variable relationships
 plot(importance)
 
-```
 
-Before examining the tree, let's delve into how the model assigns importance to predictor variables. Unsurprisingly, budget emerges as the top indicator of movie revenue, succeeded by release month, distributor, and other variables. This analysis underscores the notion that the count of genres does indeed influence release revenue.
-
-Below is the visualization of our decision tree and model performance metrics after running our test set.
-
-```{r Regression Tree Plots Tree, echo=FALSE}
-
-#res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
-  #labs(title = "Prediction vs Actual",
-       #subtitle = "Decision Tree - Regression")
-
-library(rpart.plot)
-
-rpart.plot(
-  model$fit,
-  roundint = FALSE,
-  cex = 0.5,  # Adjust the value of cex for the desired text size
-  fallen.leaves = FALSE,
-  extra = "auto",
-  main = "Regression Tree"
-)
-
-# Obtain and showcase the model's predictions and actual values
-res <- model %>% predict(new_data = test_baked) %>%
-  bind_cols(test_baked %>% dplyr::select(Worldwide))
-
-
-# Highlight key metrics for a comprehensive view
-metrics_table <- res %>% 
-  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
-  knitr::kable(align = "c", caption = "Model Performance Metrics")
-
-# Display the refined table
-metrics_table
-```
-
-## **Error Analysis**
-
-The model's performance metrics suggest suboptimal accuracy in predicting test set revenue. The mean absolute error (MAE) averages around 132 million, signifying notable deviations from actual values. Additionally, the R-squared value indicates that our factors explain only about 20% of the actual values. To explore model limitations, we'll focus on outliers, identifying areas where the model struggles for potential enhancements. The plot below depicts the connection between residuals and actual values, highlighting instances of significant prediction deviations.
-
-```{r error analysis, include-FALSE, echo=FALSE}
-
-# Calculate residuals
-residuals_df <- tibble(
-  Worldwide = test_baked$Worldwide,
-  predicted = test_predictions$.pred,
-  residuals = test_baked$Worldwide - test_predictions$.pred
-)
-
-# Scatter plot of residuals
-threshold <- 1e8  # Set your threshold for identifying outliers
-ggplot(residuals_df, aes(x = Worldwide, y = residuals)) +
-  geom_point(color = "blue") +
-  geom_point(data = filter(residuals_df, abs(residuals) > threshold), color = "red", size = 3) +
-  labs(title = "Residuals vs Actual Values", x = "Actual Values", y = "Residuals")
-
-# Identify movies with the largest residuals
-worst_predictions <- residuals_df %>%
-  mutate(MovieName = df_test$Title) %>%
-  arrange(desc(abs(residuals))) %>%
-  head(10)  # Adjust the number based on your preference
-
-# Identify movies with the largest residuals
-best_predictions <- residuals_df %>%
-  mutate(MovieName = df_test$Title) %>%
-  arrange((abs(residuals))) %>%
-  head(10)  # Adjust the number based on your preference
-
-
-```
-
-The chart suggests outliers in predictions, particularly in high-revenue areas.
-
-Now, let's analyze residuals, focusing on budget—the most influential factor. We'll set "close" and "bad" thresholds for estimates, emphasizing inclusivity. Using budget, a key predictor, a boxplot highlights where our estimates succeed (budget ~ $50 million) and where they struggle (budget > $150 million), possibly due to the complexity of higher-budget films with additional influencing factors.
-
-```{r Error Analysis 2, echo=FALSE}
-
-# Print or view the table of movies with the worst predictions
-print(worst_predictions)
-print(best_predictions)
-print(residuals_df)
-
-close_threshold = 1e7  # 10 million
-bad_threshold = 5e8   # 500 million
-
-residuals_df <- residuals_df %>%
-  mutate(EstimateCategory = case_when(
-    abs(residuals) <= close_threshold ~ "Close Estimate",
-    abs(residuals) > bad_threshold ~ "Bad Estimate",
-    TRUE ~ "Other"
-  )) %>%
-  filter(EstimateCategory %in% c("Close Estimate", "Bad Estimate"))
-
-# Assuming df_test is your test dataframe with relevant characteristics
-
-# Merge df_test information into residuals_df
-merged_df <- merge(
-  residuals_df,
-  df_test[, c("Worldwide", "Title", "Budget", "Release Month", "Distributor", "MPAA", "Run Time (Mins)", "First Genre", "count_genres")],
-  by = "Worldwide"
-)
-
-# Summary statistics for features
-summary_stats <- merged_df %>%
-  group_by(EstimateCategory) %>%
-  summarise_all(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)))
-
-# Visual comparisons (e.g., boxplots)
-ggplot(merged_df, aes(x = EstimateCategory, y = Budget)) +
-  geom_boxplot() +
-  labs(title = "Comparison of Budget between Estimate Categories")
-
-merged_df <- merged_df[complete.cases(merged_df), ]
-
-
-```
-
-
-
-```{r Re-Run Prediction}
-
-library(dplyr)
-library(parsnip)
-library(ggplot2)
-# Split data
-
-df_test_new <- df_test %>%
-  dplyr::filter(Budget < 125000000)
-
-test_baked <- recipes::bake(recipe_pipeline, df_test_new)  # Corrected to use test_baked
-
-# Modeling
-model <- parsnip::decision_tree(mode = "regression") %>%
-  parsnip::set_engine("rpart") %>%
-  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
-
-# Predictions on the test set
-test_predictions <- predict(model, new_data = test_baked)
-
-# Obtain and showcase the model's predictions and actual values
-res <- model %>% predict(new_data = test_baked) %>%
-  bind_cols(test_baked %>% dplyr::select(Worldwide))
-
-
-# Highlight key metrics for a comprehensive view
-metrics_table_2 <- res %>% 
-  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
-  knitr::kable(align = "c", caption = "Model Performance Metrics")
-
-metrics_table
-
-```
-
-```{r SHIT, echo=FALSE}
-
-# Function to perform t-test and handle missing values
-perform_t_test <- function(x) {
-  if (any(is.na(x))) {
-    return(NA)
-  } else {
-    t_test_result <- tryCatch(
-      t.test(x ~ EstimateCategory, data = merged_df),
-      error = function(e) NA
-    )
-    return(t_test_result$p.value)
-  }
-}
-
-# Perform statistical tests for each numeric feature
-test_results <- merged_df %>%
-  summarise(across(where(is.numeric), perform_t_test))
-test_results
 ```
 
 ```{r eval=FALSE, include=FALSE}
+
+unreleased_movie_data <- data.frame(
+  Budget = 160000000,  # Replace with the actual budget value
+  Distributor = "Lions Gate Films",  # Replace with the actual distributor value
+  `Release Month` = "Nov",  # Replace with the actual release month value
+  MPAA = "PG-13",  # Replace with the actual MPAA rating value
+  `Run Time (Mins)` = 137,
+  `First Genre` = "Action",
+  `count_genres` = 4,
+)
+
+library(dplyr)
+
+unreleased_movie_data <- unreleased_movie_data %>%
+  dplyr::rename(
+    Budget = Budget,
+    Distributor = Distributor,
+    `Release Month` = `Release.Month`,
+    MPAA = MPAA,
+    `Run Time (Mins)` = `Run.Time..Mins.`,
+    `First Genre` = `First.Genre`
+  )
+
+
+unreleased_movie_data
+
+unreleased_movie_baked <- recipes::bake(recipe_pipeline, unreleased_movie_data)
+prediction <- predict(model, unreleased_movie_baked)
+
+print(prediction)
+
+```
+
+```{r shiny-app, echo=FALSE, message=FALSE, warning=FALSE}
 # Sampling
 df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
 df_train2 <- rsample::training(df_split2)
 
+df_train2 <- df_train2 %>% 
+  dplyr::mutate(Director_Count = str_count(Director, ",") + 1,
+                Writer_Count = str_count(Writer, ",") + 1,
+                Genres_Count = count_genres,
+                Primary_Genre = `First Genre`)
 # Training Data
 recipe_pipeline2 <- recipes::recipe(Worldwide ~ Budget + 
                                       Distributor + 
                                       `Earliest Release Date` + 
                                       MPAA + 
                                       `Run Time (Mins)` + 
-                                      Star, 
+                                      Star + 
+                                      Director_Count + 
+                                      Writer_Count +
+                                      Genres_Count +
+                                      Primary_Genre, 
                                     data = df_train2) %>%
-  recipes::step_mutate(Budget_Category = cut(Budget, 
-                                     breaks = c(-Inf, 75000000, 150000000, Inf), 
-                                     labels = c("Small", "Medium", "Large"))) %>% 
   step_mutate(Release_Month = month(`Earliest Release Date`, label = TRUE)) %>%
-  step_mutate(Run_Time_Category = ifelse(`Run Time (Mins)` < 120, "Regular", "Long")) %>%
   step_dummy(Star, one_hot = TRUE) %>%
   recipes::prep()
 
@@ -1094,31 +996,81 @@ lm_fit <- parsnip::linear_reg(mode = "regression") %>%
   parsnip::set_engine("lm") %>%
   parsnip::fit(Worldwide ~ ., data = train_baked2)
 
-# PREDICTION
-new_data <- tibble::tibble(
-  Budget = 97000000,  # Replace with your budget value
-  Distributor = "Twentieth Century Fox",  # Replace with your distributor
-  `Earliest Release Date` = as.Date("2017-03-17"),  # Replace with your release date
-  MPAA = "R",  # Replace with your MPAA rating
-  `Run Time (Mins)` = 137,  # Replace with your run time
-  Star = "Hugh Jackman"  # Replace with your star value
+top_stars <- head(star$Star, 50)
+
+ui <- fluidPage(
+  titlePanel("Predict Your Own Movie's Revenue!"),
+  sidebarLayout(
+    sidebarPanel(
+      fluidRow(
+        column(width = 6,
+          textInput("budget", "Budget", value = ""),
+          selectInput("distributor", "Distributor",
+                      choices = c("Warner Bros.", "Universal Pictures", 
+                                  "Walt Disney Studios Motion Pictures", 
+                                  "Sony Pictures Entertainment (SPE)", 
+                                  "Twentieth Century Fox", "Paramount Pictures", 
+                                  "Lions Gate Films", "DreamWorks Distribution"), 
+                      selected = "Warner Bros."),
+          dateInput("release_date", "Release Date", value = ""),
+          selectInput("mpaa_rating", "MPAA Rating",
+                      choices = c("PG", "PG-13", "R"), selected = "PG-13"),
+          numericInput("director_count", "# of Directors", value = 1)
+        ),
+        column(width = 6,
+          numericInput("writer_count", "# of Writers", value = 1),
+          selectInput("star", "Star", choices = top_stars, selected = top_stars[1]),
+          numericInput("duration", "Duration (Mins)", value = 120),
+          numericInput("genres_count", "# of Genres", value = 1),
+          selectInput("primary_genre", "Primary Genre",
+                      choices = c("Adventure", "Comedy", "Fantasy", "Animation", "Family", 
+                                  "Biography", "Drama", "History", "Action", "Sci-Fi", 
+                                  "Crime", "Mystery", "Thriller", "Musical", "Romance", 
+                                  "Horror", "Sport", "Documentary", "Music", "War", 
+                                  "Western", "Short"), 
+                      selected = "Action")
+        )
+      ),
+      actionButton("predict_button", "Predict Revenue")
+    ),
+    mainPanel(
+      textOutput("prediction_output")
+    )
+  )
 )
 
+server <- function(input, output) {
+  predicted_revenue <- eventReactive(input$predict_button, {
+    new_data <- tibble(
+      Budget = as.numeric(input$budget),
+      Distributor = input$distributor,
+      `Earliest Release Date` = as.Date(input$release_date),
+      MPAA = input$mpaa_rating,
+      Director_Count = as.numeric(input$director_count),
+      Writer_Count = as.numeric(input$writer_count),
+      Star = input$star,
+      `Run Time (Mins)` = as.numeric(input$duration),
+      Genres_Count = as.numeric(input$genres_count),
+      Primary_Genre = input$primary_genre,
+    )
 
-# Bake the new data using the same recipe
-new_data_baked <- recipes::bake(recipe_pipeline2, new_data)
+    # Bake the new data using the updated recipe
+    new_data_baked <- recipes::bake(recipe_pipeline2, new_data)
 
-# Make predictions using the trained model
-predictions <- predict(lm_fit, new_data_baked)
+    # Make predictions using the trained model
+    predictions <- predict(lm_fit, new_data_baked)
 
-# View the predicted worldwide revenue
-predictions
+    # Return the predicted revenue as a numeric value
+    as.numeric(predictions)
+  })
 
-test <- df %>% 
-  dplyr::group_by(Distributor) %>% 
-  dplyr::summarise(count = n()) %>% 
-  dplyr::arrange(desc(count))
-test
+  # Display the predicted revenue as a numeric value
+  output$prediction_output <- renderText({
+    predicted_revenue()
+  })
+}
 
+# Run the Shiny app
+shinyApp(ui, server)
 ```
 
