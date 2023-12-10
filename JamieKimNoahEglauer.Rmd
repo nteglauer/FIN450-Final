@@ -7,6 +7,7 @@ output:
 author:
   - "Jamie Kim"
   - "Noah Eglauer"
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -48,7 +49,6 @@ rs_driver_object <- rsDriver(browser = "firefox",
 # Create a Client object
 remDr <- rs_driver_object$client
 ```
-
 
 ```{r Revenue For the top movies_per_page movies of each year from 2024 - num_pages, eval=FALSE, include=FALSE}
 
@@ -325,8 +325,9 @@ df
 ```
 
 
-
+::: {style="text-align: center;"}
 # **Executive Summary**
+:::
 
 1. Films released in May and June perform better than any other month. There is also yearly seasonality in revenue.
 2. **Budget** is the largest influence in Revenue, dictating many aspects of the film. 
@@ -339,22 +340,31 @@ df
 9. Our predictive model preformed significantly worse on movies with a budget greater than *$125,000,000*, this is likely due to the complexity of higher-budget films with more influencing factors
 10. We were able to improve our predictive model significantly by reducing outliers and filtering movies where budgets were lower than this threshold.
 
+::: {style="text-align: center;"}
 ## **Project Framework: Definition and Methodology**
+:::
 In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced analysis of important factors such as  the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office and ultimately provide a framework for users to increase earning potential for their films.
 
 The data was obtained through the use of our own web scraping algorithm and covers the top 75 grossing movies over the past 25 years.
 
+::: {style="text-align: center;"}
 ## **Limitations**
+:::
 - Our data only covers relatively successful films. As a result, our analysis is only relevant for larger film productions.
 - Our data set is relatively small and the model could be improved with more data. 
 - Outliers are present because of blockbuster films which may skew the analysis.
 - Some data is incomplete/missing observations.
 
+------------------------------------------------------------------------
+
+::: {style="text-align: center;"}
 ## **Temporal Analysis**
+:::
 Over time, the average revenue demonstrates a distinct upward trend, with a notable observation regarding the rate of growth in Foreign revenue compared to Domestic revenue. The surge in global revenue is primarily driven by the rapid expansion of foreign revenue, highlighting the escalating growth and acceptance of Western films in international markets.
 
 The onset of the Covid-19 Pandemic significantly impacted the film industry, evident in the graph. Productions were halted, and theaters closed, leading to a substantial loss of earning potential. The lockdown measures globally disrupted filming schedules, postponed releases, and the closure of theaters eliminated a crucial avenue for revenue. This had a ripple effect across the industry, affecting filmmakers, actors, crew members, distributors, and exhibitors. The industry's vulnerability to external shocks became apparent, prompting the need for innovative adaptations to navigate the challenges such as online releases.
 
+<div style="text-align: center;">
 ```{r Movie Revenue Trends over Time, echo=FALSE, message=FALSE, warning=FALSE}
 
 revenue <- df %>% 
@@ -389,6 +399,7 @@ revenue_plot <- revenue %>%
 revenue_plot
 
 ```
+</div>
 
 The impact of the month of film release is a fascinating observation. Notably, films hitting the screens in May and June consistently outperform those released in other months. Utilizing an analysis of variance (ANOVA) shows a significant disparity in average revenue across different release months. Several factors contribute to this phenomenon:
 
@@ -397,6 +408,8 @@ The impact of the month of film release is a fascinating observation. Notably, f
 2. Strategic Release Patterns: The film industry acknowledges this pattern, leading to a clustering effect. Recognizing the advantageous months, more popular and anticipated films tend to be strategically released during May and June. This intentional scheduling capitalizes on the observed heightened audience engagement during these months.
 
 3. Genre Preferences: Certain movie genres, such as action, adventure, and fantasy, are often associated with May and June releases as seen in the graph. These genres tend to draw larger audiences and generate higher revenue, contributing to the observed pattern. (Median Revenue used to account for outliers)
+
+<div style="text-align: center;">
 ```{r Release Month Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 release_month <- df %>% 
@@ -443,6 +456,7 @@ anova_table <- kable(tidy(release_month_anova)) %>%
 anova_table
 
 ```
+</div>
 
 Another notable observation is the seasonality exhibited in the average revenue over a year. The seasonal strength, quantified by a value of 0.5817723, signifies a substantial recurring pattern within our data set.
 
@@ -450,6 +464,7 @@ This strong seasonality implies that there are recurring trends or patterns in r
 
 In practical terms, this finding prompts a closer examination of the temporal distribution of revenue throughout the year. A more detailed exploration of which months or seasons contribute significantly to high or low average revenues can unveil insights that may guide release strategies, marketing efforts, or resource allocation.
 
+<div style="text-align: center;">
 ```{r Release Month Seasonality, echo=FALSE, message=FALSE, warning=FALSE}
 
 month_seasonality <- release_month %>% 
@@ -471,11 +486,17 @@ ts %>%
   kable("html") %>%
   kable_styling()
 ```
+</div>
 
+------------------------------------------------------------------------
+
+::: {style="text-align: center;"}
 ## **Film Characteristics and Insights**
+:::
 
 Undoubtedly, a film's budget stands as the biggest influencer of its success, controlling most aspects of production. A substantial financial backing allows for elevated production values, sophisticated marketing strategies, and the recruitment of established talent, all crucial elements that contribute to a film's overall quality and marketability. This dynamic relationship is graphically portrayed by the slope of the regression line, emphasizing the large influence of budget and the multifaceted components shaping a film's trajectory.
 
+<div style="text-align: center;">
 ```{r Budget Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 budget <- df %>% 
@@ -491,6 +512,7 @@ budget <- df %>%
 
 budget
 ```
+</div>
 
 Over the course of cinematic history, there has been a gradual and discernible increase in the average run time of films. Films also tend to do better the longer they are. However, the difference isn't as drastic between short and medium length films. Films were split into the following categories:
 
@@ -498,6 +520,7 @@ Over the course of cinematic history, there has been a gradual and discernible i
 - Medium: Less than 120 Minutes
 - Long: 120+ Minutes
 
+<div style="text-align: center;">
 ```{r Length Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 length <- df %>% 
   dplyr::select(Title, Worldwide, `Run Time (Mins)`, `Earliest Release Date`) %>% 
@@ -536,9 +559,11 @@ length_plot <- df %>%
 length_plot | length_category_plot
 
 ```
+</div>
 
 The rating of a film is important as it dictates the specific demographics to which the film is likely to appeal. While the rating, in general, might not wield a substantial influence on the overall revenue of a film, a notable exception is observed with the "R" rating. Films carrying an "R" rating exhibit a significant decrease in average revenue, aligning with the overarching understanding that "R" rated movies cater to a comparatively smaller demographic, thus potentially limiting their market reach. This distinctive trend highlights the impact of content restrictions on audience accessibility and the subsequent financial performance of a film.
 
+<div style="text-align: center;">
 ```{r Rating Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 rating <- df %>% 
@@ -556,11 +581,13 @@ ggplot(rating, aes(x = MPAA, y = Worldwide, fill = MPAA)) +
   theme(legend.position = "none")
 
 ```
+</div>
 
 The influence of a film distributor on its earning potential is a pivotal factor in the cinematic landscape. One standout performer in this realm is Walt Disney Studios Motion Pictures, demonstrating a consistent track record of increasing the revenue of the films distributed over time. This commendable trend not only positions Disney as a powerhouse in film distribution but also emphasizes the strategic vision and market awareness that the studio brings to the table.
 
 Walt Disney Studios Motion Pictures has distinguished itself by not only delivering successful individual film releases but also by fostering a cumulative improvement in revenue trends across its portfolio. This sustained success suggests a combination of effective marketing strategies, adept distribution planning, and a keen understanding of audience preferences. The studio's ability to not only maintain but enhance its films' revenue trajectories points to a dynamic and forward-thinking approach in navigating the ever-evolving landscape of the film industry.
 
+<div style="text-align: center;">
 ```{r Distributor Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 distributor <- df %>% 
@@ -599,11 +626,13 @@ disney <- df %>%
 distributor
 disney
 ```
+</div>
 
 The genre of a film is a crucial aspect that defines its style, tone, and overall artistic expression. It serves as a blueprint, giving audiences a general idea of what to expect and helping filmmakers convey their vision effectively. The genre serves as a crucial component in the marketing and promotion of a film. It helps studios target specific demographics and tailor promotional campaigns to reach the intended audience.
 
 As illustrated in the chart, Sci-Fi and Adventure emerge as the most lucrative genres within the film industry. This can be primarily attributed to the presence of many blockbuster titles within these specific genres. Despite the presence of outliers, which could represent exceptional cases or singular phenomena, the overarching trend reflected in the chart suggests a consistent and widespread favoritism towards Sci-Fi and Adventure genres. This pattern implies that audiences are consistently drawn to these genres, reinforcing their status as the forefront contributors to the film industry's financial success.
 
+<div style="text-align: center;">
 ```{r Genre Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 
 genre <- df %>% 
@@ -634,6 +663,7 @@ genre_distribution <- genre %>%
 genre_plot
 
 ```
+</div>
 
 Upon analyzing the revenue distributions across genres, a notable observation emerged: the box plots for the Fantasy and Family genres exhibited remarkable similarity. This observation prompted a deeper exploration into the correlations among various genre combinations.
 
@@ -641,6 +671,7 @@ A noteworthy finding was the high positive correlation between the Animation and
 
 This negative correlation sparks a thought-provoking notion — the potential for an innovative and revolutionary genre combination. The rarity of Thriller-Comedy hybrids in the current cinematic landscape presents an opportunity for filmmakers to experiment. This unexplored territory not only provides creative potential but also introduces the possibility of captivating a diverse audience with a novel cinematic experience.
 
+<div style="text-align: center;">
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 genre_occurrence <- genre %>% 
   count(Title, Genres) %>%
@@ -651,9 +682,11 @@ genre_occurrence <- genre %>%
 correlation_matrix <- cor(genre_occurrence[, -c(1, 2)])
 corrplot(correlation_matrix, method = "color", addrect = 2)
 ```
+</div>
 
 Movies often navigate across various genres to broaden their appeal and cater to a diverse demographic. The trend indicates that a film's performance tends to improve as it incorporates multiple genres, with the optimal balance appearing to be around six genres.
 
+<div style="text-align: center;">
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 genres_per_movie <- df %>% 
   dplyr::select(Title, Worldwide, Genres) %>% 
@@ -672,13 +705,21 @@ genres_per_movie <- df %>%
 
 genres_per_movie
 ```
+</div>
 
+------------------------------------------------------------------------
+
+::: {style="text-align: center;"}
 ## **Cast & Crew Analysis**
+:::
+
 The composition of the cast is a crucial factor in the success of a film, where actors have the ability to either propel or hinder its success. While the quantification of an actor's precise impact on a film's success may pose a challenge, delving into the data reveals enlightening insights.
 
 There appears to be a shift in audience preferences. The audience, while still embracing the familiarity of established actors, demonstrates a growing affinity for emerging talents. This graph also reveals the audience is now forging connections with a new cohort of actors who have become their own "regulars."
 
 When seeking the ideal star for an upcoming film, Robert Downey Jr. or Chris Pratt stands out. Both actors have established themselves as powerhouses of the new cohort of actors.
+
+<div style="text-align: center;">
 ```{r Cast Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 cast <- df %>% 
   dplyr::select(Title, Worldwide, Cast) %>% 
@@ -729,6 +770,7 @@ star_plot <- star %>%
 plotly::ggplotly(star_plot, tooltip = "text")
 
 ```
+</div>
 
 The crew is the backbone of the production process for a film. There exists a prevailing assumption that a larger crew equates to a more successful production—a notion that holds true for certain professions but conversely defies expectations for others. All else being equal:
 
@@ -739,6 +781,7 @@ The crew is the backbone of the production process for a film. There exists a pr
 
 Note that heteroscedasticity exists in our data set which raises concerns about the reliability of certain statistical inferences.
 
+<div style="text-align: center;">
 ```{r Crew Analysis, echo=FALSE, message=FALSE, warning=FALSE}
 #RUN REGRESSION ANALYSIS
 
@@ -764,9 +807,13 @@ revenue_table
 
 autoplot(revenue_lm, size = 0.5)
 ```
+</div>
 
+------------------------------------------------------------------------
 
+::: {style="text-align: center;"}
 ## **Predictive Analysis**
+:::
 
 Building upon the insights gained from our prior information and analysis, we will employ diverse workflow models for predictive analytics. The objective is to ascertain the global box office revenue projections for upcoming, yet-to-be-released movies.
 
@@ -778,7 +825,7 @@ In the subsequent analysis, we made a deliberate effort to incorporate these not
 
 Before examining the tree, let's delve into how the model assigns importance to predictor variables. Unsurprisingly, budget emerges as the top indicator of movie revenue, succeeded by release month, distributor, and other variables. This analysis underscores the notion that the count of genres does indeed influence release revenue.
 
-
+<div style="text-align: center;">
 ```{r Regression Tree Analysis, echo=FALSE, warning=FALSE, include=FALSE, message=FALSE}
 
 library(dplyr)
@@ -822,7 +869,6 @@ model <- parsnip::decision_tree(mode = "regression") %>%
 test_predictions <- predict(model, new_data = test_baked)
 ```
 
-
 ```{r Regression Tree Plots Importance, echo=FALSE, message=FALSE, warning=FALSE}
 
 # Assuming 'model' is your decision tree model and 'df_test' is your testing data
@@ -836,11 +882,13 @@ importance
 
 
 ```
+</div>
 
 Following the construction and training of our model, we partitioned the dataset into two segments: 80% for training and 20% for testing. A training iteration facilitated the application of our recently trained model to conduct a predictive analysis on the worldwide revenue of all films within our designated test set. The model adhered to the decision tree criteria, and the accuracy of its predictions is quantified and documented through metrics such as RMSE, RSQ, and MAE.
 
 Below is the visualization of our decision tree and model performance metrics after running our test set.
 
+<div style="text-align: center;">
 ```{r Regression Tree Plots Tree, echo=FALSE, message=FALSE, warning=FALSE}
 
 #res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
@@ -871,11 +919,17 @@ metrics_table <- res %>%
 # Display the refined table
 metrics_table
 ```
+</div>
 
+------------------------------------------------------------------------
+
+::: {style="text-align: center;"}
 ## **Error Analysis**
+:::
 
 The model's performance metrics suggest suboptimal accuracy in predicting test set revenue. The mean absolute error (MAE) averages around 132 million, signifying notable deviations from actual values. Additionally, the R-squared value indicates that our factors explain only about 20% of the actual values. To explore model limitations, we'll focus on outliers, identifying areas where the model struggles for potential enhancements. The plot below depicts the connection between residuals and actual values, highlighting instances of significant prediction deviations.
 
+<div style="text-align: center;">
 ```{r error analysis, include-FALSE, echo=FALSE, message=FALSE, warning=FALSE}
 
 # Calculate residuals
@@ -906,11 +960,13 @@ best_predictions <- residuals_df %>%
 
 
 ```
+</div>
 
 The chart suggests outliers in predictions, particularly in high-revenue areas.
 
 Now, let's analyze residuals, focusing on budget—the most influential factor. We'll set "close" and "bad" thresholds for estimates, emphasizing inclusivity. Using budget, a key predictor, a boxplot highlights where our estimates succeed (budget ~ $50 million) and where they struggle (budget > $150 million), possibly due to the complexity of higher-budget films with additional influencing factors.
 
+<div style="text-align: center;">
 ```{r Error Analysis 2, echo=FALSE, message=FALSE, warning=FALSE}
 
 # Print or view the table of movies with the worst predictions
@@ -966,10 +1022,11 @@ merged_df <- merged_df[complete.cases(merged_df), ]
 
 
 ```
-
+</div>
 
 Following adjustments made according to error analysis and the exclusion of films with budget values below $125,000,000, a notable enhancement in our model's predictive accuracy becomes apparent. More precisely, the model has achieved a significant improvement in Mean Percentage Error (MPE) by roughly 28%. Furthermore, there is an observed increase of approximately 8% in R-squared, providing additional support to the notion that films with higher budgets exhibit a more complex interplay of variables influencing their revenue.
 
+<div style="text-align: center;">
 ```{r Re-Run Prediction, message=FALSE, warning=FALSE, echo=FALSE}
 
 library(dplyr)
@@ -1005,6 +1062,7 @@ metrics_table_2 <- res %>%
 metrics_table_2
 
 ```
+</div>
 
 ## Opportunities for Further Analysis
 
@@ -1018,9 +1076,13 @@ Our predictive analysis, though revealing suboptimal accuracy, demonstrated the 
 
 As the film industry continues to evolve, adaptability and informed decision-making become paramount. This analysis equips industry professionals with valuable insights, offering a roadmap for navigating the complexities of filmmaking, maximizing revenue potential, and fostering success in an ever-changing landscape.
 
+------------------------------------------------------------------------
+
+::: {style="text-align: center;"}
 ## **Shiny App Extension**
+:::
 
-
+<div style="text-align: center;">
 ```{r shiny-app, echo=FALSE, message=FALSE, warning=FALSE}
 # Sampling
 df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
@@ -1131,6 +1193,7 @@ server <- function(input, output) {
 # Run the Shiny app
 shinyApp(ui, server)
 ```
+</div>
 
 ```{r extra, echo=FALSE, message=FALSE, warning=FALSE}
 
