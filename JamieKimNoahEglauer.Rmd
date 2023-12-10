@@ -3,7 +3,6 @@ title: "Exploring The World of Cinema"
 date: "09/12/2023"
 output: 
   html_document:
-    runtime: shiny
 author:
   - "Jamie Kim"
   - "Noah Eglauer"
@@ -49,52 +48,6 @@ rs_driver_object <- rsDriver(browser = "firefox",
 remDr <- rs_driver_object$client
 ```
 
-```{r scraping new release, eval=FALSE, include=FALSE}
-library(rvest)
-library(stringr)
-library(dplyr)
-library(tidyr)
-
-# Replace 'your_url_here' with the actual URL of the webpage
-url <- "https://www.imdb.com/calendar/?ref_=rlm&region=US&type=MOVIE"
-
-# Read the HTML content of the webpage
-webpage <- read_html(url)
-
-# Use the identified CSS selector for the movie elements
-movie_elements <- html_nodes(webpage, '.ipc-metadata-list-summary-item')
-
-# Initialize an empty list to store data for each movie
-movies_data <- list()
-
-# Loop through each movie element
-for (i in seq_along(movie_elements)) {
-  # Extract title
-  title <- html_text(html_node(movie_elements[[i]], '.ipc-metadata-list-summary-item__t'))
-
-  # Extract year (assuming it's within the title link)
-  year <- gsub("[^0-9]", "", str_match(title, "\\((\\d{4})\\)")[, 2])
-
-  # Extract genres
-  genres <- html_text(html_nodes(movie_elements[[i]], '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__tl .ipc-inline-list__item'))
-
-  # Extract stars
-  stars <- html_text(html_nodes(movie_elements[[i]], '.ipc-inline-list--show-dividers.ipc-metadata-list-summary-item__stl .ipc-inline-list__item'))
-
-  # Store the data for the current movie in a list
-  movie_data <- list(title = title, year = year, genres = paste(genres, collapse = ", "), stars = paste(stars, collapse = ", "))
-
-  # Append the list to the movies_data list
-  movies_data <- append(movies_data, list(movie_data))
-}
-
-# Convert the list of lists into a data frame
-new_movies_df <- bind_rows(movies_data)
-
-# Print the resulting data frame
-print(new_movies_df)
-
-```
 
 ```{r Revenue For the top movies_per_page movies of each year from 2024 - num_pages, eval=FALSE, include=FALSE}
 
@@ -370,49 +323,7 @@ df
 
 ```
 
-```{r import economic data, include=FALSE}
 
-library(tidyr)
-library(tidyquant)
-library(dplyr)
-
-# Set get ="economic.data" in tq_get()
-import_economic_data <- tidyquant::tq_get(c("DPCCRV1Q225SBEA", "UNRATE", "DGS10"),
-                                         get  = "economic.data",
-                                         from = "1999-01-01",
-                                         to   = Sys.Date()) %>% 
-  dplyr::mutate(symbol = dplyr::case_when(symbol == "DPCCRV1Q225SBEA" ~ "Consumer Spending % (USA)",
-                                          symbol == "UNRATE" ~ "Unemployment Rate % (USA)",
-                                          symbol == "DGS10" ~ "U.S Treasury Yield "))
-
-economic_data <- import_economic_data %>%
-  tidyr::pivot_wider(names_from = symbol, values_from = price) %>%
-  tidyr::complete(date = seq.Date(from = min(date), to = max(date), by = "1 month")) %>%
-  dplyr::arrange(date)  %>%
-  dplyr::select(date, `Consumer Spending % (USA)`) %>%
-  tidyr::drop_na()
-
-economic_data # df that includes Consumer Spending, Unemployment Rate, and Fed Funds Rate in the United States with aligned dates
-
-
-theatre_stocks <- tidyquant::tq_get(
-  c("IMAX", "CGX", "SPY"),
-  get  = "stock.prices",
-) %>%
-  dplyr::transmute(date, series = symbol, value = adjusted) %>%
-  dplyr::group_by(series) %>%
-  dplyr::mutate(
-    ret = log(value / dplyr::lag(value))
-  ) %>%
-  dplyr::select(-value) %>%
-  tidyr::pivot_wider(names_from = series, values_from = ret) %>%
-  tidyr::drop_na()
-
-
-theatre_stocks #includes returns daily for IMAX and Cineplex stocks
-
-
-```
 
 # **Executive Summary**
 
@@ -852,6 +763,260 @@ revenue_table
 autoplot(revenue_lm, size = 0.5)
 ```
 
+
+## **Predictive Analysis**
+
+Building upon the insights gained from our prior information and analysis, we will employ diverse workflow models for predictive analytics. The objective is to ascertain the global box office revenue projections for upcoming, yet-to-be-released movies.
+
+## Regression Tree Analysis
+
+Here, our aim is to train a model for utilizing a regression tree to forecast the global revenue of an upcoming release. In our preceding analysis, we established some influencing factors which we will incorporate to help the model perform.
+
+In the subsequent analysis, we made a deliberate effort to incorporate these noteworthy elements, encompassing budget, distributor, release month, MPAA rating, runtime in minutes, the primary genre, and the count of genres.
+
+
+```{r Regression Tree Analysis, echo=FALSE, warning=FALSE, include=FALSE, message=FALSE}
+
+library(dplyr)
+library(parsnip)
+library(ggplot2)
+# Split data
+set.seed(123)  # Set a seed for reproducibility
+
+df <- df %>%
+  dplyr::mutate(	
+Distributor = substr(Distributor, 1, 5), `First Genre` = substr(`First Genre`,1,5))
+
+df_split <- df %>% rsample::initial_split(prop = 0.80)
+df_train <- rsample::training(df_split)
+df_test  <- rsample::testing(df_split)
+
+# Worldwide as dependent variable
+recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = df_train) %>%
+  # step_rm(date) %>%
+  recipes::prep()
+
+train_baked <- recipes::bake(recipe_pipeline, df_train)
+
+recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = df_test) %>%
+  # step_rm(date) %>%
+  recipes::prep()
+
+test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
+
+
+common_levels_distributor <- intersect(levels(train_baked$Distributor), levels(test_baked$Distributor))
+train_baked$Distributor <- factor(train_baked$Distributor, levels = common_levels_distributor)
+test_baked$Distributor <- factor(test_baked$Distributor, levels = common_levels_distributor)
+
+# Modeling
+model <- parsnip::decision_tree(mode = "regression") %>%
+  parsnip::set_engine("rpart") %>%
+  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
+
+# Predictions on the test set
+test_predictions <- predict(model, new_data = test_baked)
+```
+
+
+```{r Regression Tree Plots Importance, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Assuming 'model' is your decision tree model and 'df_test' is your testing data
+library(parsnip)
+library(yardstick)
+library(vip)
+
+# Assess variable importance
+importance <- model %>% vip()
+importance
+
+
+```
+
+Before examining the tree, let's delve into how the model assigns importance to predictor variables. Unsurprisingly, budget emerges as the top indicator of movie revenue, succeeded by release month, distributor, and other variables. This analysis underscores the notion that the count of genres does indeed influence release revenue.
+
+Below is the visualization of our decision tree and model performance metrics after running our test set.
+
+```{r Regression Tree Plots Tree, echo=FALSE, message=FALSE, warning=FALSE}
+
+#res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
+  #labs(title = "Prediction vs Actual",
+       #subtitle = "Decision Tree - Regression")
+
+library(rpart.plot)
+
+rpart.plot(
+  model$fit,
+  roundint = FALSE,
+  cex = 0.5,  # Adjust the value of cex for the desired text size
+  fallen.leaves = FALSE,
+  extra = "auto",
+  main = "Regression Tree"
+)
+
+# Obtain and showcase the model's predictions and actual values
+res <- model %>% predict(new_data = test_baked) %>%
+  bind_cols(test_baked %>% dplyr::select(Worldwide))
+
+
+# Highlight key metrics for a comprehensive view
+metrics_table <- res %>% 
+  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
+  knitr::kable(align = "c", caption = "Model Performance Metrics")
+
+# Display the refined table
+metrics_table
+```
+
+## **Error Analysis**
+
+The model's performance metrics suggest suboptimal accuracy in predicting test set revenue. The mean absolute error (MAE) averages around 132 million, signifying notable deviations from actual values. Additionally, the R-squared value indicates that our factors explain only about 20% of the actual values. To explore model limitations, we'll focus on outliers, identifying areas where the model struggles for potential enhancements. The plot below depicts the connection between residuals and actual values, highlighting instances of significant prediction deviations.
+
+```{r error analysis, include-FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Calculate residuals
+residuals_df <- tibble(
+  Worldwide = test_baked$Worldwide,
+  predicted = test_predictions$.pred,
+  residuals = test_baked$Worldwide - test_predictions$.pred
+)
+
+# Scatter plot of residuals
+threshold <- 1e8  # Set your threshold for identifying outliers
+ggplot(residuals_df, aes(x = Worldwide, y = residuals)) +
+  geom_point(color = "blue") +
+  geom_point(data = filter(residuals_df, abs(residuals) > threshold), color = "red", size = 3) +
+  labs(title = "Residuals vs Actual Values", x = "Actual Values", y = "Residuals")
+
+# Identify movies with the largest residuals
+worst_predictions <- residuals_df %>%
+  mutate(MovieName = df_test$Title) %>%
+  arrange(desc(abs(residuals))) %>%
+  head(10)  # Adjust the number based on your preference
+
+# Identify movies with the largest residuals
+best_predictions <- residuals_df %>%
+  mutate(MovieName = df_test$Title) %>%
+  arrange((abs(residuals))) %>%
+  head(10)  # Adjust the number based on your preference
+
+
+```
+
+The chart suggests outliers in predictions, particularly in high-revenue areas.
+
+Now, let's analyze residuals, focusing on budget—the most influential factor. We'll set "close" and "bad" thresholds for estimates, emphasizing inclusivity. Using budget, a key predictor, a boxplot highlights where our estimates succeed (budget ~ $50 million) and where they struggle (budget > $150 million), possibly due to the complexity of higher-budget films with additional influencing factors.
+
+```{r Error Analysis 2, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Print or view the table of movies with the worst predictions
+#print(worst_predictions)
+#print(best_predictions)
+#print(residuals_df)
+
+close_threshold = 1e7  # 10 million
+bad_threshold = 5e8   # 500 million
+
+residuals_df <- residuals_df %>%
+  mutate(EstimateCategory = case_when(
+    abs(residuals) <= close_threshold ~ "Close Estimate",
+    abs(residuals) > bad_threshold ~ "Bad Estimate",
+    TRUE ~ "Other"
+  )) %>%
+  filter(EstimateCategory %in% c("Close Estimate", "Bad Estimate"))
+
+# Assuming df_test is your test dataframe with relevant characteristics
+
+# Merge df_test information into residuals_df
+merged_df <- merge(
+  residuals_df,
+  df_test[, c("Worldwide", "Title", "Budget", "Release Month", "Distributor", "MPAA", "Run Time (Mins)", "First Genre", "count_genres")],
+  by = "Worldwide"
+)
+
+# Summary statistics for features
+summary_stats <- merged_df %>%
+  group_by(EstimateCategory) %>%
+  summarise_all(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)))
+
+# Custom color palette
+custom_palette <- c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854")
+
+# Create a visually appealing boxplot
+ggplot(merged_df, aes(x = EstimateCategory, y = Budget, fill = EstimateCategory)) +
+  geom_boxplot(color = "black", alpha = 0.8) +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "Comparison of Budget between Estimate Categories",
+       x = "Estimate Categories",
+       y = "Budget",
+       caption = "Data Source: Your Source") +
+  theme_minimal() +
+  theme(legend.position = "none",      # Remove legend
+        plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+        axis.title.x = element_text(size = 12),
+        axis.title.y = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+merged_df <- merged_df[complete.cases(merged_df), ]
+
+
+```
+
+
+Following adjustments made according to error analysis and the exclusion of films with budget values below 125,000,000, a notable enhancement in our model's predictive accuracy becomes apparent. More precisely, the model has achieved a significant improvement in Mean Percentage Error (MPE) by roughly 28%. Furthermore, there is an observed increase of approximately 8% in R-squared, providing additional support to the notion that films with higher budgets exhibit a more complex interplay of variables influencing their revenue.
+
+```{r Re-Run Prediction, message=FALSE, warning=FALSE, echo=FALSE}
+
+library(dplyr)
+library(parsnip)
+library(ggplot2)
+# Split data
+
+df_test_new <- df_test %>%
+  dplyr::filter(Budget < 125000000)
+
+test_baked <- recipes::bake(recipe_pipeline, df_test_new)  # Corrected to use test_baked
+
+# Modeling
+model <- parsnip::decision_tree(mode = "regression") %>%
+  parsnip::set_engine("rpart") %>%
+  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
+
+# Predictions on the test set
+test_predictions <- predict(model, new_data = test_baked)
+
+# Obtain and showcase the model's predictions and actual values
+res <- model %>% predict(new_data = test_baked) %>%
+  bind_cols(test_baked %>% dplyr::select(Worldwide))
+
+
+# Highlight key metrics for a comprehensive view
+metrics_table_2 <- res %>% 
+  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
+  kable(align = "c", caption = "Model Performance Metrics") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE) %>%
+  row_spec(0, bold = TRUE)  # Make the header bold
+
+metrics_table_2
+
+```
+
+## Opportunities for Further Analysis
+
+Now that we have analysed the errors of our models we can easily observe that to improve the model even further we would have tackle the higher budget films where our predictions are failing. A potential approach that could be taken here to find variables that are influencing the revenue of these moves could be a Principal Component Analysis. By conducting this analysis we could gain further insights into possible underlying factors that seem to impact these films.
+
+## Conclusion
+
+In conclusion, our comprehensive analysis of various factors influencing box office success has unearthed valuable insights for the film industry. From temporal trends to influential characteristics, our exploration provides a nuanced understanding that can guide decision-makers in the dynamic landscape of filmmaking.
+
+Our predictive analysis, though revealing suboptimal accuracy, demonstrated the potential for improvement. Error analysis led to adjustments and exclusions, resulting in a notable enhancement in the model's predictive accuracy. The findings highlight the complexity of variables influencing revenue, with a particular emphasis on the challenges presented by higher budget films.
+
+As the film industry continues to evolve, adaptability and informed decision-making become paramount. This analysis equips industry professionals with valuable insights, offering a roadmap for navigating the complexities of filmmaking, maximizing revenue potential, and fostering success in an ever-changing landscape.
+
+## **Shiny App Extension**
+
+
 ```{r shiny-app, echo=FALSE, message=FALSE, warning=FALSE}
 # Sampling
 df_split2 <- df %>% rsample::initial_time_split(prop = 0.9999)
@@ -963,228 +1128,7 @@ server <- function(input, output) {
 shinyApp(ui, server)
 ```
 
-
-## **Predictive Analysis**
-
-Building upon the insights gained from our prior information and analysis, we will employ diverse workflow models for predictive analytics. The objective is to ascertain the global box office revenue projections for upcoming, yet-to-be-released movies.
-
-## Regression Tree Analysis
-
-Here, our aim is to train a model for utilizing a regression tree to forecast the global revenue of an upcoming release. In our preceding analysis, we established some influencing factors which we will incorporate to help the model perform.
-
-In the subsequent analysis, we made a deliberate effort to incorporate these noteworthy elements, encompassing budget, distributor, release month, MPAA rating, runtime in minutes, the primary genre, and the count of genres.
-
-
-```{r Regression Tree Analysis, echo=FALSE, warning=FALSE, include=FALSE}
-
-library(dplyr)
-library(parsnip)
-library(ggplot2)
-# Split data
-set.seed(123)  # Set a seed for reproducibility
-
-df <- df %>%
-  dplyr::mutate(	
-Distributor = substr(Distributor, 1, 5), `First Genre` = substr(`First Genre`,1,5))
-
-df_split <- df %>% rsample::initial_split(prop = 0.80)
-df_train <- rsample::training(df_split)
-df_test  <- rsample::testing(df_split)
-
-# Worldwide as dependent variable
-recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = df_train) %>%
-  # step_rm(date) %>%
-  recipes::prep()
-
-train_baked <- recipes::bake(recipe_pipeline, df_train)
-
-recipe_pipeline <- recipes::recipe(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre`+`count_genres`, data = df_test) %>%
-  # step_rm(date) %>%
-  recipes::prep()
-
-test_baked <- recipes::bake(recipe_pipeline, df_test)  # Corrected to use test_baked
-
-
-common_levels_distributor <- intersect(levels(train_baked$Distributor), levels(test_baked$Distributor))
-train_baked$Distributor <- factor(train_baked$Distributor, levels = common_levels_distributor)
-test_baked$Distributor <- factor(test_baked$Distributor, levels = common_levels_distributor)
-
-# Modeling
-model <- parsnip::decision_tree(mode = "regression") %>%
-  parsnip::set_engine("rpart") %>%
-  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
-
-# Predictions on the test set
-test_predictions <- predict(model, new_data = test_baked)
-```
-
-
-```{r Regression Tree Plots Importance, echo=FALSE}
-
-# Assuming 'model' is your decision tree model and 'df_test' is your testing data
-library(parsnip)
-library(yardstick)
-library(vip)
-
-# Assess variable importance
-importance <- model %>% vip()
-
-# Assess variable relationships
-plot(importance)
-
-```
-
-Before examining the tree, let's delve into how the model assigns importance to predictor variables. Unsurprisingly, budget emerges as the top indicator of movie revenue, succeeded by release month, distributor, and other variables. This analysis underscores the notion that the count of genres does indeed influence release revenue.
-
-Below is the visualization of our decision tree and model performance metrics after running our test set.
-
-```{r Regression Tree Plots Tree, echo=FALSE}
-
-#res %>% ggplot(aes(x = .pred, y = Worldwide)) + geom_point() +
-  #labs(title = "Prediction vs Actual",
-       #subtitle = "Decision Tree - Regression")
-
-library(rpart.plot)
-
-rpart.plot(
-  model$fit,
-  roundint = FALSE,
-  cex = 0.5,  # Adjust the value of cex for the desired text size
-  fallen.leaves = FALSE,
-  extra = "auto",
-  main = "Regression Tree"
-)
-
-# Obtain and showcase the model's predictions and actual values
-res <- model %>% predict(new_data = test_baked) %>%
-  bind_cols(test_baked %>% dplyr::select(Worldwide))
-
-
-# Highlight key metrics for a comprehensive view
-metrics_table <- res %>% 
-  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
-  knitr::kable(align = "c", caption = "Model Performance Metrics")
-
-# Display the refined table
-metrics_table
-```
-
-## **Error Analysis**
-
-The model's performance metrics suggest suboptimal accuracy in predicting test set revenue. The mean absolute error (MAE) averages around 132 million, signifying notable deviations from actual values. Additionally, the R-squared value indicates that our factors explain only about 20% of the actual values. To explore model limitations, we'll focus on outliers, identifying areas where the model struggles for potential enhancements. The plot below depicts the connection between residuals and actual values, highlighting instances of significant prediction deviations.
-
-```{r error analysis, include-FALSE, echo=FALSE}
-
-# Calculate residuals
-residuals_df <- tibble(
-  Worldwide = test_baked$Worldwide,
-  predicted = test_predictions$.pred,
-  residuals = test_baked$Worldwide - test_predictions$.pred
-)
-
-# Scatter plot of residuals
-threshold <- 1e8  # Set your threshold for identifying outliers
-ggplot(residuals_df, aes(x = Worldwide, y = residuals)) +
-  geom_point(color = "blue") +
-  geom_point(data = filter(residuals_df, abs(residuals) > threshold), color = "red", size = 3) +
-  labs(title = "Residuals vs Actual Values", x = "Actual Values", y = "Residuals")
-
-# Identify movies with the largest residuals
-worst_predictions <- residuals_df %>%
-  mutate(MovieName = df_test$Title) %>%
-  arrange(desc(abs(residuals))) %>%
-  head(10)  # Adjust the number based on your preference
-
-# Identify movies with the largest residuals
-best_predictions <- residuals_df %>%
-  mutate(MovieName = df_test$Title) %>%
-  arrange((abs(residuals))) %>%
-  head(10)  # Adjust the number based on your preference
-
-
-```
-
-The chart suggests outliers in predictions, particularly in high-revenue areas.
-
-Now, let's analyze residuals, focusing on budget—the most influential factor. We'll set "close" and "bad" thresholds for estimates, emphasizing inclusivity. Using budget, a key predictor, a boxplot highlights where our estimates succeed (budget ~ $50 million) and where they struggle (budget > $150 million), possibly due to the complexity of higher-budget films with additional influencing factors.
-
-```{r Error Analysis 2, echo=FALSE}
-
-# Print or view the table of movies with the worst predictions
-print(worst_predictions)
-print(best_predictions)
-print(residuals_df)
-
-close_threshold = 1e7  # 10 million
-bad_threshold = 5e8   # 500 million
-
-residuals_df <- residuals_df %>%
-  mutate(EstimateCategory = case_when(
-    abs(residuals) <= close_threshold ~ "Close Estimate",
-    abs(residuals) > bad_threshold ~ "Bad Estimate",
-    TRUE ~ "Other"
-  )) %>%
-  filter(EstimateCategory %in% c("Close Estimate", "Bad Estimate"))
-
-# Assuming df_test is your test dataframe with relevant characteristics
-
-# Merge df_test information into residuals_df
-merged_df <- merge(
-  residuals_df,
-  df_test[, c("Worldwide", "Title", "Budget", "Release Month", "Distributor", "MPAA", "Run Time (Mins)", "First Genre", "count_genres")],
-  by = "Worldwide"
-)
-
-# Summary statistics for features
-summary_stats <- merged_df %>%
-  group_by(EstimateCategory) %>%
-  summarise_all(funs(mean(., na.rm = TRUE), sd(., na.rm = TRUE)))
-
-# Visual comparisons (e.g., boxplots)
-ggplot(merged_df, aes(x = EstimateCategory, y = Budget)) +
-  geom_boxplot() +
-  labs(title = "Comparison of Budget between Estimate Categories")
-
-merged_df <- merged_df[complete.cases(merged_df), ]
-
-
-```
-
-```{r Re-Run Prediction}
-
-library(dplyr)
-library(parsnip)
-library(ggplot2)
-# Split data
-
-df_test_new <- df_test %>%
-  dplyr::filter(Budget < 125000000)
-
-test_baked <- recipes::bake(recipe_pipeline, df_test_new)  # Corrected to use test_baked
-
-# Modeling
-model <- parsnip::decision_tree(mode = "regression") %>%
-  parsnip::set_engine("rpart") %>%
-  parsnip::fit(Worldwide ~ Budget + Distributor + `Release Month` + MPAA + `Run Time (Mins)` + `First Genre` + `count_genres`, data = train_baked)
-
-# Predictions on the test set
-test_predictions <- predict(model, new_data = test_baked)
-
-# Obtain and showcase the model's predictions and actual values
-res <- model %>% predict(new_data = test_baked) %>%
-  bind_cols(test_baked %>% dplyr::select(Worldwide))
-
-
-# Highlight key metrics for a comprehensive view
-metrics_table <- res %>% 
-  yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
-  knitr::kable(align = "c", caption = "Model Performance Metrics")
-
-metrics_table
-
-```
-
-```{r SHIT, echo=FALSE}
+```{r extra, echo=FALSE, message=FALSE, warning=FALSE}
 
 # Function to perform t-test and handle missing values
 perform_t_test <- function(x) {
@@ -1202,6 +1146,5 @@ perform_t_test <- function(x) {
 # Perform statistical tests for each numeric feature
 test_results <- merged_df %>%
   summarise(across(where(is.numeric), perform_t_test))
-test_results
 ```
 

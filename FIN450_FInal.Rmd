@@ -1180,11 +1180,41 @@ res <- model %>% predict(new_data = test_baked) %>%
 
 
 # Highlight key metrics for a comprehensive view
-metrics_table <- res %>% 
+metrics_table_2 <- res %>% 
   yardstick::metrics(truth = Worldwide, estimate = .pred) %>%
   knitr::kable(align = "c", caption = "Model Performance Metrics")
 
-metrics_table
+metrics_table_2
+
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Extract metrics from both tables
+metrics_original <- metrics_table %>% as.data.frame()
+metrics_new <- metrics_table_2 %>% as.data.frame()
+
+# Combine metrics into a single data frame
+combined_metrics <- bind_rows(
+  mutate(metrics_original, Model = "Original"),
+  mutate(metrics_new, Model = "New")
+)
+
+# Reshape data for better visualization
+combined_metrics_long <- combined_metrics %>%
+  pivot_longer(cols = c("MAE", "RMSE", "R2"), names_to = "Metric", values_to = "Value")
+
+# Plot side-by-side bar charts
+ggplot(combined_metrics_long, aes(x = Model, y = Value, fill = Metric)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  labs(title = "Comparison of Model Metrics",
+       subtitle = "Original vs. New Model",
+       x = "Model",
+       y = "Metric Value") +
+  theme_minimal() +
+  theme(legend.position = "top")
 
 ```
 
