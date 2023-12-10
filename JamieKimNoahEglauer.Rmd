@@ -3,6 +3,7 @@ title: "Exploring The World of Cinema"
 date: "09/12/2023"
 output: 
   html_document:
+    runtime: shiny
 author:
   - "Jamie Kim"
   - "Noah Eglauer"
@@ -335,7 +336,8 @@ df
 6. Sci-Fi and Adventure emerge as the most successful genres. Thriller and Comedy has the strongest negative correlation providing a potential unexplored territory of genre pairing. Films also tend to do better the more genres it covers with 6 being the optimal amount.
 7. The audience demonstrates a growing affinity for emerging talents with Robert Downey Jr. and Christ Pratt being the powerhouses of the new cohort of actors.
 8. Films do better with more writers and editors, and less producers and composers.
-9. 
+9. Our predictive model preformed significantly worse on movies with a budget greater than $125,000,000, this is likely due to the complexity of higher-budget films with more influencing factors
+10. We were able to improve our predictive model significantly by reducing outliers and filtering movies where budgets were lower than this threshold.
 
 ## **Project Framework: Definition and Methodology**
 In this report, we will explore the various factors that impact and influence the monetary success of a movie at the box office. Our investigation extends beyond mere fiscal considerations, encompassing a nuanced analysis of important factors such as  the cast and crew. By scrutinizing these diverse components, this report aims to provide a comprehensive understanding of the factors that defines a movie's monetary success at the box office and ultimately provide a framework for users to increase earning potential for their films.
@@ -774,6 +776,8 @@ Here, our aim is to train a model for utilizing a regression tree to forecast th
 
 In the subsequent analysis, we made a deliberate effort to incorporate these noteworthy elements, encompassing budget, distributor, release month, MPAA rating, runtime in minutes, the primary genre, and the count of genres.
 
+Before examining the tree, let's delve into how the model assigns importance to predictor variables. Unsurprisingly, budget emerges as the top indicator of movie revenue, succeeded by release month, distributor, and other variables. This analysis underscores the notion that the count of genres does indeed influence release revenue.
+
 
 ```{r Regression Tree Analysis, echo=FALSE, warning=FALSE, include=FALSE, message=FALSE}
 
@@ -833,7 +837,7 @@ importance
 
 ```
 
-Before examining the tree, let's delve into how the model assigns importance to predictor variables. Unsurprisingly, budget emerges as the top indicator of movie revenue, succeeded by release month, distributor, and other variables. This analysis underscores the notion that the count of genres does indeed influence release revenue.
+Following the construction and training of our model, we partitioned the dataset into two segments: 80% for training and 20% for testing. A training iteration facilitated the application of our recently trained model to conduct a predictive analysis on the worldwide revenue of all films within our designated test set. The model adhered to the decision tree criteria, and the accuracy of its predictions is quantified and documented through metrics such as RMSE, RSQ, and MAE.
 
 Below is the visualization of our decision tree and model performance metrics after running our test set.
 
