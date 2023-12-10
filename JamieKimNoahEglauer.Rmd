@@ -329,14 +329,14 @@ df
 # **Executive Summary**
 
 1. Films released in May and June perform better than any other month. There is also yearly seasonality in revenue.
-2. Budget is the largest influence in Revenue, dictating many aspects of the film. 
-3. Films have gotten slightly longer over time, and films that are over 120 Minutes perform exceptionally better than shorter films.
-4. Differences in revenue by MPAA rating are small, except for the "R" rating which performs significantly worse than other ratings.
-5. Walt Disney Studios performs better than other distributors and has shown increasing revenue over time.
-6. Sci-Fi and Adventure emerge as the most successful genres. Thriller and Comedy has the strongest negative correlation providing a potential unexplored territory of genre pairing. Films also tend to do better the more genres it covers with 6 being the optimal amount.
-7. The audience demonstrates a growing affinity for emerging talents with Robert Downey Jr. and Christ Pratt being the powerhouses of the new cohort of actors.
+2. **Budget** is the largest influence in Revenue, dictating many aspects of the film. 
+3. Films have gotten slightly longer over time, and films that are over *120 Minutes* perform exceptionally better than shorter films.
+4. Differences in revenue by MPAA rating are small, except for the **"R"** rating which performs significantly worse than other ratings.
+5. *Walt Disney Studios* performs better than other distributors and has shown increasing revenue over time.
+6. **Sci-Fi** and **Adventure** emerge as the most successful genres. **Thriller** and **Comedy** has the strongest negative correlation providing a potential unexplored territory of genre pairing. Films also tend to do better the more genres it covers with 6 being the optimal amount.
+7. The audience demonstrates a growing affinity for emerging talents with *Robert Downey Jr.* and *Christ Pratt* being the powerhouses of the new cohort of actors.
 8. Films do better with more writers and editors, and less producers and composers.
-9. Our predictive model preformed significantly worse on movies with a budget greater than $125,000,000, this is likely due to the complexity of higher-budget films with more influencing factors
+9. Our predictive model preformed significantly worse on movies with a budget greater than *$125,000,000*, this is likely due to the complexity of higher-budget films with more influencing factors
 10. We were able to improve our predictive model significantly by reducing outliers and filtering movies where budgets were lower than this threshold.
 
 ## **Project Framework: Definition and Methodology**
@@ -968,7 +968,7 @@ merged_df <- merged_df[complete.cases(merged_df), ]
 ```
 
 
-Following adjustments made according to error analysis and the exclusion of films with budget values below 125,000,000, a notable enhancement in our model's predictive accuracy becomes apparent. More precisely, the model has achieved a significant improvement in Mean Percentage Error (MPE) by roughly 28%. Furthermore, there is an observed increase of approximately 8% in R-squared, providing additional support to the notion that films with higher budgets exhibit a more complex interplay of variables influencing their revenue.
+Following adjustments made according to error analysis and the exclusion of films with budget values below $125,000,000, a notable enhancement in our model's predictive accuracy becomes apparent. More precisely, the model has achieved a significant improvement in Mean Percentage Error (MPE) by roughly 28%. Furthermore, there is an observed increase of approximately 8% in R-squared, providing additional support to the notion that films with higher budgets exhibit a more complex interplay of variables influencing their revenue.
 
 ```{r Re-Run Prediction, message=FALSE, warning=FALSE, echo=FALSE}
 
